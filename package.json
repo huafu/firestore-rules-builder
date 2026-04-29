@@ -1,0 +1,58 @@
+{
+  "name": "@huafu/firestore-rules-builder",
+  "version": "0.1.0",
+  "description": "Strongly typed DSL to generate Firebase Firestore Security Rules",
+  "type": "module",
+  "author": {
+    "name": "Huafu Gandon",
+    "email": "huafu.gandon@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/huafu/firestore-rules-builder.git"
+  },
+  "keywords": [
+    "firestore",
+    "firebase",
+    "security-rules",
+    "dsl",
+    "typescript"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "clean": "rm -rf dist",
+    "dev": "vite build --watch",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.eslint.json --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10",
+    "@types/node": "^22",
+    "eslint": "^10",
+    "globals": "^17",
+    "jiti": "^2",
+    "prettier": "^3",
+    "typescript": "^6",
+    "typescript-eslint": "^8",
+    "vite": "^8",
+    "vite-plugin-dts": "^4",
+    "vitest": "^4"
+  }
+}
