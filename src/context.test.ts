@@ -24,6 +24,9 @@ describe("context", () => {
       expect(RuleExpression.toString(ctx.const("hello"))).toBe('"hello"')
       expect(RuleExpression.toString(ctx.if(ctx.raw("request.auth")))).toBe("request.auth")
       expect(RuleExpression.toString(ctx.unless(ctx.raw("request.auth")))).toBe("!(request.auth)")
+      expect(RuleExpression.toString(ctx.always())).toBe("true")
+      expect(RuleExpression.toString(ctx.never())).toBe("false")
+      expect(RuleExpression.toString(ctx.expr("raw")("request.time"))).toBe("request.time")
     })
 
     it("builds logical/comparison expressions", () => {
@@ -32,9 +35,16 @@ describe("context", () => {
       expect(RuleExpression.toString(ctx.and(ctx.raw("a"), ctx.raw("b")))).toMatch(
         /^\s*a\s+&&\s+b\s*$/,
       )
+      expect(RuleExpression.toString(ctx.andBlock(ctx.raw("a"), ctx.raw("b")))).toMatch(
+        /^\(\s*a\s+&&\s+b\s*\)$/,
+      )
       expect(RuleExpression.toString(ctx.or(ctx.raw("a"), ctx.raw("b")))).toMatch(
         /^\s*a\s+\|\|\s*b\s*$/,
       )
+      expect(RuleExpression.toString(ctx.orBlock(ctx.raw("a"), ctx.raw("b")))).toMatch(
+        /^\(\s*a\s+\|\|\s+b\s*\)$/,
+      )
+      expect(RuleExpression.toString(ctx.not(ctx.raw("request.auth")))).toBe("!(request.auth)")
       expect(RuleExpression.toString(ctx.eq(ctx.raw("a"), ctx.raw("b")))).toBe("a == b")
       expect(RuleExpression.toString(ctx.neq(ctx.raw("a"), ctx.raw("b")))).toBe("a != b")
       expect(RuleExpression.toString(ctx.gt(ctx.raw("a"), ctx.raw("b")))).toBe("a > b")
@@ -44,6 +54,9 @@ describe("context", () => {
       expect(RuleExpression.toString(ctx.isset(ctx.raw("request.auth")))).toBe(
         "request.auth != null",
       )
+      expect(RuleExpression.toString(ctx.return(ctx.raw("request.auth != null")))).toBe(
+        "return request.auth != null;",
+      )
     })
 
     it("supports ternary/select/parens/join", () => {
@@ -52,6 +65,12 @@ describe("context", () => {
       expect(
         RuleExpression.toString(ctx.ternary(ctx.raw("cond"), ctx.raw("a"), ctx.raw("b"))),
       ).toBe("cond ? a : b")
+      expect(
+        RuleExpression.toString(ctx.when(ctx.raw("request.method"), "get", (v) => v, ctx.null)),
+      ).toBe('request.method == "get" ? request.method : null')
+      expect(RuleExpression.toString(ctx.default(ctx.raw("candidate"), ctx.raw("fallback")))).toBe(
+        "candidate != null ? candidate : fallback",
+      )
       expect(
         RuleExpression.toString(
           ctx.select([ctx.raw("a"), ctx.raw("x")], [ctx.raw("b"), ctx.raw("y")], ctx.raw("z")),

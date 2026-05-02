@@ -59,6 +59,13 @@ export const createRuleContextBase = (): RuleContextBase => {
     lt: (left, right) => expr("lt")`${operand(left)} < ${operand(right)}`,
     lte: (left, right) => expr("lte")`${operand(left)} <= ${operand(right)}`,
     not: (condition) => expr("not")`!${ctx.parens(condition)}`,
+    when: (value, equalTo, thenExpr, elseExpr) => {
+      const condition = ctx.eq(value, equalTo)
+      const thenPart = typeof thenExpr === "function" ? thenExpr(value) : operand(thenExpr)
+      const elsePart = typeof elseExpr === "function" ? elseExpr(value) : operand(elseExpr)
+      return ctx.ternary(condition, thenPart, elsePart)
+    },
+    default: (value, defaultValue) => ctx.ternary(ctx.neq(value, ctx.null), value, defaultValue),
     parens: (op) => {
       const e = operand(op)
       if (RuleExpression.is(e, "parens")) return e

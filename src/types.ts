@@ -349,27 +349,57 @@ export type RuleContextDbHelpers<Db extends AnyFullDbSchema> = {
  * form the full rule context.
  */
 export interface RuleContextBase {
+  /** Literal Firestore rule expression for boolean true. */
   true: RuleExpression<"true">
+  /** Literal Firestore rule expression for boolean false. */
   false: RuleExpression<"false">
+  /** Literal Firestore rule expression for null. */
   null: RuleExpression<"null">
+  /** Low-level expression factory for constructing custom typed expressions. */
   expr: typeof expr
+  /** Emits raw Firestore rule source without escaping or transformation. */
   raw: Expr<"raw">
+  /** Converts a primitive JS value into a Firestore constant operand expression. */
   const(value: PrimitiveRuleValue): RuleExpression<"const">
+  /** Shorthand for an unconditional allow expression equivalent to if true. */
   always(): RuleExpression<"if">
+  /** Shorthand for a deny expression equivalent to if false. */
   never(): RuleExpression<"if">
+  /** Pass-through helper that marks a condition as an allow expression. */
   if(condition: RuleOperand): RuleExpression<"if">
+  /** Negated allow helper equivalent to if not(condition). */
   unless(condition: RuleOperand): RuleExpression<"if">
+  /** Joins multiple conditions with logical AND. */
   and(...conditions: [RuleOperand, ...(readonly RuleOperand[])]): RuleExpression<"and">
+  /** Wraps an AND expression in parentheses for explicit grouping. */
   andBlock(...conditions: [RuleOperand, ...(readonly RuleOperand[])]): RuleExpression<"parens">
+  /** Joins multiple conditions with logical OR. */
   or(...conditions: [RuleOperand, ...(readonly RuleOperand[])]): RuleExpression<"or">
+  /** Wraps an OR expression in parentheses for explicit grouping. */
   orBlock(...conditions: [RuleOperand, ...(readonly RuleOperand[])]): RuleExpression<"parens">
+  /** Negates a condition expression. */
   not(condition: RuleOperand): RuleExpression<"not">
+  /** Emits an explicit return statement, typically for helper function bodies. */
   return(condition: RuleOperand): RuleExpression<"return">
+  /** Builds a ternary expression using condition ? trueExpr : falseExpr. */
   ternary(
     condition: RuleOperand,
     trueExpr: RuleOperand,
     falseExpr: RuleOperand,
   ): RuleExpression<"ternary">
+  /**
+   * Branches on value equality and supports callback-based branch construction.
+   *
+   * Equivalent to `value == equalTo ? thenExpr : elseExpr`.
+   */
+  when<T extends RuleExpression>(
+    value: T,
+    equalTo: RuleOperand,
+    thenExpr: ((val: T) => RuleExpression) | RuleOperand,
+    elseExpr: ((val: T) => RuleExpression) | RuleOperand,
+  ): RuleExpression<"ternary">
+  /** Returns value when it is not null, otherwise returns defaultValue. */
+  default(value: RuleOperand, defaultValue: RuleOperand): RuleExpression<"ternary">
   /**
    * Builds chained conditional expressions from `[condition, result]` pairs and a default value.
    *
@@ -381,14 +411,23 @@ export interface RuleContextBase {
       defaultCase: RuleOperand,
     ]
   ): RuleExpression<"select">
+  /** Equality comparison helper (==). */
   eq(left: RuleOperand, right: RuleOperand): RuleExpression<"eq">
+  /** Inequality comparison helper (!=). */
   neq(left: RuleOperand, right: RuleOperand): RuleExpression<"neq">
+  /** Null-check helper equivalent to value != null. */
   isset(value: RuleOperand): RuleExpression<"isset">
+  /** Greater-than comparison helper (>). */
   gt(left: RuleOperand, right: RuleOperand): RuleExpression<"gt">
+  /** Greater-than-or-equal comparison helper (>=). */
   gte(left: RuleOperand, right: RuleOperand): RuleExpression<"gte">
+  /** Less-than comparison helper (<). */
   lt(left: RuleOperand, right: RuleOperand): RuleExpression<"lt">
+  /** Less-than-or-equal comparison helper (<=). */
   lte(left: RuleOperand, right: RuleOperand): RuleExpression<"lte">
+  /** Wraps an expression in parentheses unless already parenthesized. */
   parens(condition: RuleOperand): RuleExpression<"parens">
+  /** Joins a list of operands with a custom separator expression. */
   join(separator: string, parts: readonly RuleOperand[]): RuleExpression<"join">
 }
 

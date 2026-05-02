@@ -41,5 +41,5 @@ jobs:
       - name: Build library
         run: npm run build
 
-      - name: Integration test packed package with index.test.ts
+      - name: Integration test
         run: npm run test:tarball-integration
