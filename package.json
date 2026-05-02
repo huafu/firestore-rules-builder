@@ -19,6 +19,9 @@
     "dsl",
     "typescript"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "sideEffects": false,
   "files": [
     "dist"
