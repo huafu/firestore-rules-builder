@@ -1,113 +1,67 @@
-/**
- * @huafu/firestore-rules-builder
- *
- * A strongly typed TypeScript DSL for generating Firestore Security Rules with full IDE support
- * and type safety.
- *
- * ## Quick Start
- *
- * ```typescript
- * import { createFirestoreRules } from '@huafu/firestore-rules-builder'
- *
- * const rules = createFirestoreRules()
- *   .rules((ns) => {
- *     ns.users(($) => ({
- *       read: $.if($.isset($.request.auth.uid))
- *     }))
- *   })
- *   .build()
- * ```
- *
- * ## Main Exports
- *
- * - {@link createFirestoreRules} - Factory to create a rules builder
- * - {@link RuleContext} - Type for the rule context object
- * - {@link CommonHelpers} - Common authentication helpers
- * - {@link PathProxy} - Type for typed data access
- * - {@link firestoreRulesCommonHelpers} - Register common auth helpers
- *
- * @packageDocumentation
- */
+import { FirestoreRulesBuilder } from "./builder"
+import { createRuleContextBase, createRuleContextDbHelpers } from "./context"
+import { HelpersRegistry } from "./helpers-registry"
+import type { DbMeta, DbSchema, FullDbSchema, ParentNamesFor } from "./types"
 
 /**
- * Factory function to create a new Firestore rules builder.
+ * Public schema and context types used to describe a Firestore rules model.
  *
- * This is the entry point for constructing Firestore Security Rules with type safety.
+ * These types cover collection declarations, derived rule-context typing, and
+ * a few convenience aliases that consumer code commonly imports alongside the
+ * builder factory.
+ */
+export type {
+  DbCollection,
+  timestamp,
+  RuleContextFor,
+  AnyFullDbNamespace as AnyDbNamespace,
+  AnyFullDbSchema as AnyDbSchema,
+  DataKeysFor,
+  DbMeta,
+} from "./types"
+export type { RuleExpression, RuleOperand } from "./expression"
+export type { RegisterHelper } from "./helpers-registry"
+export { RuleError } from "./context"
+
+/**
+ * Bundled helper factory with common authentication and ownership checks.
+ *
+ * Use it with {@link createFirestoreRulesBuilder} via `withHelpers(...)` when
+ * the default helper set is enough for a project.
+ */
+export { commonFirestoreRulesHelpers } from "./common-helpers"
+
+/**
+ * Creates the root rules builder for a typed Firestore schema.
+ *
+ * The returned builder starts at the database root, already wired with the
+ * base rule helpers and database traversal helpers. From there, consumer code
+ * can register reusable helpers, enter collections, define `allow` clauses,
+ * and render the final Firestore rules source.
+ *
+ * @typeParam Schema - Top-level Firestore collection schema.
+ * @typeParam Meta - Optional metadata used to refine typed runtime values such
+ * as `request.auth.token` claims.
  *
  * @example
- * ```typescript
- * const builder = createFirestoreRules<MySchema>();
+ * ```ts
+ * const builder = createFirestoreRulesBuilder<{
+ *   users: DbCollection<{ ownerId: string }>
+ * }>()
  * ```
  *
- * @see {@link FirestoreRulesBuilder} for the builder API
+ * @returns A root builder that can traverse the declared schema and render the
+ * corresponding Firestore rules file.
  */
-export { createFirestoreRules } from "./builder"
-
-/**
- * Register common authentication and authorization helper functions.
- *
- * Includes helpers for:
- * - isAuthenticated(): Check if user has valid auth token
- * - hasClaim(claim, expected): Check JWT token claims
- * - isOwner(uid): Compare UIDs for ownership checks
- * - isAuthenticatedAndOwner(uid): Combined auth + ownership check
- * - isServerTime(timestamp): Verify server timestamp
- *
- * @example
- * ```typescript
- * const rules = createFirestoreRules()
- *   .withHelpers(firestoreRulesCommonHelpers)
- *   .rules((ns) => {
- *     ns.users(($) => ({
- *       read: $.if($.lib.isAuthenticated())
- *     }))
- *   })
- * ```
- *
- * @see {@link CommonHelpers} for the interface
- */
-export { registerCommonHelpers as firestoreRulesCommonHelpers } from "./common-helpers"
-
-/**
- * Interface for common authentication and authorization helpers.
- *
- * @see {@link firestoreRulesCommonHelpers}
- */
-export type { CommonHelpers } from "./common-helpers"
-
-/**
- * Type for strongly-typed nested property access in rule expressions.
- *
- * Enables autocomplete and type checking for accessing deeply nested document fields.
- *
- * @example
- * ```typescript
- * interface User { profile: { name: string } }
- * const proxy: PathProxy<User> = ctx.resource.data;
- * proxy.profile.name // Type-safe, autocomplete available
- * ```
- *
- * @see {@link createPathProxy}
- */
-export type { PathProxy } from "./path-proxy"
-
-/**
- * The main rule context for building expressions.
- *
- * Provides logical operations, comparisons, data validation, and access to
- * Firestore runtime values.
- *
- * @example
- * ```typescript
- * // Use in rule callbacks
- * ns.documents(($: RuleContext) => ({
- *   read: $.and(
- *     $.isset($.request.auth.uid),
- *     $.eq($.resource.data.owner, $.request.auth.uid)
- *   )
- * }))
- * ```
- *
- * @see {@link createRuleContext}
- */
-export type { RuleContext } from "./tools"
+export function createFirestoreRulesBuilder<
+  Schema extends DbSchema,
+  Meta extends DbMeta = DbMeta,
+>(): FirestoreRulesBuilder<FullDbSchema<Schema, Meta>, FullDbSchema<Schema, Meta>, never> {
+  type Db = FullDbSchema<Schema, Meta>
+  const context = {
+    ...createRuleContextDbHelpers<Db>(),
+    ...createRuleContextBase(),
+  }
+  const registry = new HelpersRegistry()
+  return new FirestoreRulesBuilder<Db, Db, never>(registry, [] as ParentNamesFor<Db>, context, {})
+}

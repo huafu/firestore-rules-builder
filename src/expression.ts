@@ -1,187 +1,174 @@
+import { RuleError } from "./context"
 import type { FormattingOptions } from "./types"
 
+type RuleSourcePart =
+  | string
+  | ((options?: FormattingOptions) => string | RuleExpression)
+  | RuleExpression
+
 /**
- * Primitive value types that can be used in Firestore Security Rules expressions.
- *
- * @example
- * const value: PrimitiveRuleValue = "hello"; // string
- * const num: PrimitiveRuleValue = 42; // number
- * const flag: PrimitiveRuleValue = true; // boolean
- * const empty: PrimitiveRuleValue = null; // null
+ * Primitive literals that can be embedded directly into generated rule source.
  */
 export type PrimitiveRuleValue = string | number | boolean | null
 
 /**
- * A rule operand can be a RuleExpression, raw RuleExpr, or primitive value.
- * This is converted to a RuleExpression through the {@link operand} function.
+ * Value accepted by rule operators and helper APIs.
+ *
+ * Primitive values are normalized through {@link operand}, while existing
+ * expressions are reused as-is.
  */
-export type RuleOperand = RuleExpression | RuleExpr | PrimitiveRuleValue
+export type RuleOperand = RuleExpression | PrimitiveRuleValue
 
 /**
- * Internal class representing a rule expression with lazy evaluation and caching support.
+ * Lazily composed Firestore rule expression.
  *
- * This class allows composition of rule expressions using lazy-evaluated functions,
- * which enables proper dependency tracking and formatting. Expressions are cached
- * after first toString() call for performance.
- *
- * @internal
+ * Instances keep their source as fragments until rendering, which lets the
+ * builder compose helpers, proxies, and conditional blocks without eagerly
+ * flattening everything into strings. The plain rendered form is cached only
+ * when no formatting overrides are applied.
  */
-class RuleExpr {
-  protected _source: (string | ((options?: FormattingOptions) => string))[]
-  protected _cachedSource?: string
+export class RuleExpression<Id extends string | null = string | null> {
+  protected _id: Id | null
+  protected _source: RuleSourcePart[]
+  protected _cachedSource?: string | undefined
 
-  public constructor(...source: (string | ((options?: FormattingOptions) => string))[]) {
-    this._source = source
+  static is<Id extends string>(value: unknown, id: Id): value is RuleExpression<Id>
+  static is(value: unknown): value is RuleExpression
+  static is(value: unknown, id?: string): value is RuleExpression {
+    return value instanceof RuleExpression && (id == null || value._id === id)
+  }
+
+  static toString(
+    expr: RuleExpression,
+    options?: FormattingOptions & { prepend?: string; append?: string },
+  ): string {
+    return expr.toString(options)
+  }
+
+  static toSourceLines(
+    expr: RuleExpression,
+    options?: FormattingOptions & { prepend?: string; append?: string },
+  ): string[] {
+    return expr.toSourceLines(options)
+  }
+
+  static create<Id extends string | null>(id: Id, source: RuleSourcePart[]): RuleExpression<Id> {
+    // TODO: handle merging or other logic for expressions depending on their IDs
+    return new RuleExpression(id, ...source)
+  }
+
+  public constructor(id: Id | undefined, ...source: RuleSourcePart[]) {
+    this._id = id ?? null
+    this._source = source.map((s) => (s && RuleExpression.is(s) ? s._source : s)).flat()
   }
 
   /**
-   * Converts the expression to its formatted string representation.
-   * Results are cached for performance.
+   * Renders the expression into Firestore source code.
    *
-   * @param options - Formatting options
-   * @returns The formatted Firestore Security Rules expression code
+   * The cache is used only for the default formatting path so that indented or
+   * wrapped render requests do not leak into later calls.
+   *
+   * @param options - Optional rendering controls.
+   * @returns The formatted Firestore rule expression.
    */
-  public toString(options?: FormattingOptions): string {
-    if (this._cachedSource !== undefined && !options?.stripComments && !options?.indentationLevel) {
+  protected toString(options?: FormattingOptions): string {
+    const canCache =
+      !options?.stripComments && !options?.indentationLevel && !options?.prepend && !options?.append
+    if (this._cachedSource !== undefined && canCache) {
       return this._cachedSource
     }
-    const source = this._source.map((s) => (typeof s === "function" ? s(options) : s)).join("")
-    this._cachedSource = reformat(source, options?.indentationLevel)
-    return this._cachedSource
-  }
-
-  /**
-   * Enables primitive coercion for use in template strings and contexts
-   * expecting a primitive value.
-   *
-   * @returns The string representation of this expression
-   */
-  public [Symbol.toPrimitive](): string {
-    return this.toString()
-  }
-
-  /**
-   * Returns the first `len` characters of this expression's source code.
-   *
-   * @param len - The maximum number of characters to return
-   * @returns A substring of up to `len` characters from the start
-   */
-  public head(len: number): string {
-    let src = ""
-    for (const part of this._source) {
-      const str = typeof part === "function" ? part() : part
-      if (src.length + str.length > len) {
-        return src + str.slice(0, len - src.length)
-      }
-      src += str
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { prepend, append, ...opt } = options ?? {}
+    const source = this._source
+      .map((s) => (typeof s === "function" ? s(opt) : RuleExpression.is(s) ? s.toString(opt) : s))
+      .join("")
+    const formatted = reformat(source, options)
+    if (canCache) {
+      this._cachedSource = formatted
     }
-    return src
+    return formatted
   }
 
-  /**
-   * Returns the last `len` characters of this expression's source code.
-   *
-   * @param len - The maximum number of characters to return
-   * @returns A substring of up to `len` characters from the end
-   */
-  public tail(len: number): string {
-    let src = ""
-    for (let i = this._source.length - 1; i >= 0; i--) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const part = this._source[i]!
-      const str = typeof part === "function" ? part() : part
-      if (src.length + str.length > len) {
-        return str.slice(str.length - (len - src.length)) + src
-      }
-      src = str + src
-    }
-    return src
-  }
-
-  /**
-   * Checks if this expression starts with the given prefix.
-   *
-   * @param prefix - The prefix to check for
-   * @returns True if the expression starts with the prefix, false otherwise
-   */
-  public startsWith(prefix: string): boolean {
-    const head = this.head(prefix.length)
-    return head === prefix
-  }
-
-  /**
-   * Checks if this expression ends with the given suffix.
-   *
-   * @param suffix - The suffix to check for
-   * @returns True if the expression ends with the suffix, false otherwise
-   */
-  public endsWith(suffix: string): boolean {
-    const tail = this.tail(suffix.length)
-    return tail === suffix
+  protected toSourceLines(options?: FormattingOptions): string[] {
+    return this.toString(options).split("\n")
   }
 }
 
 /**
- * Public alias for the RuleExpr class, representing a Firestore Security Rules expression.
- * Provides caching, lazy evaluation, and primitive coercion support.
+ * Creates expression builders that can be called directly or used as tagged templates.
  *
- * @example
- * const expr = raw("request.auth != null");
- * const expr2 = raw(() => `resource.data.owner == ${ctx.request.auth.uid}`);
+ * When an identifier is provided, the resulting expressions carry that ID.
+ * Builder internals use those IDs to recognize certain helper forms and to
+ * preserve specific expression semantics.
+ *
+ * @param id - Optional expression identifier.
+ * @returns A function that builds expressions from source parts or templates.
  */
-export const RuleExpression = RuleExpr
-/**
- * Type alias for RuleExpr with string coercion, making it behave like a string in most contexts.
- */
-export type RuleExpression = RuleExpr & string
+export const expr = ((id) =>
+  (...args) => {
+    if (args.length === 0) {
+      if (!id) throw new RuleError("Expression ID is required when no source is provided.")
+      return new RuleExpression(id, id)
+    }
+    const [first, ...rest] = args
+    if (args.length === 1 && first && RuleExpression.is(first, id)) {
+      return first
+    }
+    if (
+      Array.isArray(first) &&
+      Object.prototype.hasOwnProperty.call(first, "raw") &&
+      Array.isArray((first as TemplateStringsArray).raw)
+    ) {
+      return new RuleExpression(id, ...toParts(first as TemplateStringsArray, ...rest))
+    }
+    return new RuleExpression(id, ...(args as RuleSourcePart[]))
+  }) as ExpressionBuilder
 
-/**
- * Creates a new RuleExpression from one or more source parts.
- *
- * Supports both immediate strings and lazy-evaluated functions, enabling
- * proper dependency tracking in rule construction.
- *
- * @param source - One or more sources: strings, functions, or existing RuleExpressions
- * @returns A new RuleExpression with lazy evaluation support
- *
- * @example
- * // Static expression
- * const expr1 = raw("request.auth != null");
- *
- * // Lazy-evaluated expression
- * const expr2 = raw(() => calculateCondition());
- *
- * // Composition
- * const expr3 = raw("(", condition, ")");
- */
-export const raw = (
-  ...source: (string | ((options?: FormattingOptions) => string) | RuleExpression)[]
-): RuleExpression => {
-  if (source.length === 1 && source[0] instanceof RuleExpr) {
-    return source[0]
-  }
-  return new RuleExpr(...source) as RuleExpression
+export interface Expr<Id extends string | null = null> {
+  (strings: TemplateStringsArray, ...values: RuleSourcePart[]): RuleExpression<Id>
+  (...source: RuleSourcePart[]): RuleExpression<Id>
+}
+export interface ExpressionBuilder {
+  <Id extends string>(id: Id): Expr<Id>
+  (): Expr
 }
 
 /**
- * Converts a RuleOperand into a RuleExpression.
+ * Splits a tagged template into lazily rendered source fragments.
  *
- * Handles primitive values (string, number, boolean, null) by converting them
- * to their appropriate Firestore representation (JSON strings, numbers, true/false, null).
+ * @param strings - Literal string fragments.
+ * @param values - Interpolated fragments or expressions.
+ * @returns Source parts that can be stored without immediate rendering.
+ */
+const toParts = (strings: TemplateStringsArray, ...values: RuleSourcePart[]): RuleSourcePart[] => {
+  const source: RuleSourcePart[] = []
+
+  for (const [index, stringPart] of strings.entries()) {
+    if (stringPart !== "") {
+      source.push(stringPart)
+    }
+
+    const value = values[index]
+    if (value !== undefined) {
+      source.push(value)
+    }
+  }
+
+  return source
+}
+
+/**
+ * Normalizes any operand into a {@link RuleExpression}.
  *
- * @param operand - The operand to convert (can be expression, value, or primitive)
- * @returns A RuleExpression representing the operand
+ * Existing expressions are returned unchanged. Primitive values are converted to
+ * Firestore-safe literal source, with strings JSON-escaped.
  *
- * @example
- * operand(42) // → "42"
- * operand(true) // → "true"
- * operand(null) // → "null"
- * operand("hello") // → '"hello"'
- * operand(raw("request.auth")) // → request.auth (unchanged)
+ * @param operand - Expression or primitive operand.
+ * @returns A renderable expression.
  */
 export const operand = (operand: RuleOperand): RuleExpression => {
-  if (operand && operand instanceof RuleExpr) {
-    return operand as RuleExpression
+  if (operand && RuleExpression.is(operand)) {
+    return operand
   }
 
   let src: string
@@ -195,61 +182,51 @@ export const operand = (operand: RuleOperand): RuleExpression => {
     src = JSON.stringify(operand)
   }
 
-  return raw(src)
+  return expr("const")(src)
 }
 
 /**
- * Reformats source code to remove existing indentation and apply a new indent level.
+ * Re-indents a rendered source block using the requested formatting options.
  *
- * Detects and strips the current indentation from the first non-empty line,
- * then applies the specified indentation level.
- *
- * @param source - The source code to reformat
- * @param level - The indentation level (default: 0). Each level is 2 spaces.
- * @returns The reformatted source code
- *
- * @example
- * const code = "    hello\n    world";
- * reformat(code, 1) // → "  hello\n  world"
+ * @param source - Source block to reformat.
+ * @param options - Rendering options including indentation and wrappers.
+ * @returns The formatted block.
  */
-export const reformat = (source: string, level = 0): string => {
+const reformat = (source: string, options?: FormattingOptions): string => {
   const lines = source.split("\n")
   const firstNonEmptyLine = lines.find((line) => line.trim() !== "")
   if (firstNonEmptyLine === undefined) {
-    return source
+    return surroundWith(source, options)
   }
   const indentMatch = firstNonEmptyLine.match(/^(\s*)/)
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const currentIndent = indentMatch ? indentMatch[1]! : ""
   const src = currentIndent ? source.replace(new RegExp(`^${currentIndent}`, "gm"), "") : source
-  return indentBlock(src, level)
+  return indentBlock(surroundWith(src, options), options?.indentationLevel ?? 0)
+}
+
+const surroundWith = (str: string, options?: FormattingOptions): string => {
+  let result = str
+  if (options?.prepend) {
+    result = result.replace(/^([\s]*)/, `$1${options.prepend}`)
+  }
+  if (options?.append) {
+    result = result.replace(/([\s]*)$/, `${options.append}$1`)
+  }
+  return result
 }
 
 /**
- * Generates an indentation string for the given level.
- *
- * @param level - The indentation level. Each level is 2 spaces.
- * @returns A string of spaces for indentation
- *
- * @example
- * indentFor(0) // → ""
- * indentFor(1) // → "  "
- * indentFor(2) // → "    "
+ * Returns the two-space indentation prefix for a nesting level.
  */
 export const indentFor = (level: number): string => "  ".repeat(level)
 
 /**
- * Indents all lines of a source code block to the specified level.
+ * Indents each non-empty line in a rendered source block.
  *
- * Empty lines are preserved but not indented.
- *
- * @param source - The source code to indent
- * @param level - The indentation level. Each level is 2 spaces.
- * @returns The indented source code
- *
- * @example
- * const code = "hello\nworld";
- * indentBlock(code, 1) // → "  hello\n  world"
+ * @param source - Source block to indent.
+ * @param level - Nesting level, expressed in two-space steps.
+ * @returns The indented block.
  */
 export const indentBlock = (source: string, level: number): string => {
   const indentStr = indentFor(level)
@@ -257,4 +234,14 @@ export const indentBlock = (source: string, level: number): string => {
     .split("\n")
     .map((line) => (line.trim() === "" ? "" : indentStr + line))
     .join("\n")
+}
+
+/**
+ * Runtime primitive type guards used when proxy helpers decide how to bind values.
+ */
+export const primitive = {
+  isString: (value: RuleOperand): value is string => typeof value === "string",
+  isNumber: (value: RuleOperand): value is number => typeof value === "number",
+  isBoolean: (value: RuleOperand): value is boolean => typeof value === "boolean",
+  isNull: (value: RuleOperand): value is null => value === null,
 }

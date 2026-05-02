@@ -16,7 +16,7 @@
     "verbatimModuleSyntax": true,
     "rootDir": "./src",
     "outDir": "./dist",
-    "types": ["node", "vitest/globals"]
+    "types": ["node"]
   },
   "include": ["src"],
   "exclude": ["dist", "node_modules"]

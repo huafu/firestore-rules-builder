@@ -5,15 +5,16 @@ export default defineConfig({
   build: {
     lib: {
       entry: "src/index.ts",
-      name: "FirestoreRulesBuilder",
+      name: "createFirestoreRulesBuilder",
       formats: ["es", "cjs"],
-      fileName: (format) => (format === "es" ? "index.js" : "index.cjs")
-    }
+      fileName: (format) => (format === "es" ? "index.js" : "index.cjs"),
+    },
   },
   plugins: [
     dts({
       include: ["src/**/*.ts"],
-      outDir: "dist"
-    })
-  ]
+      exclude: ["src/**/*.test.ts", "src/**/*.test-d.ts"],
+      outDir: "dist",
+    }),
+  ],
 })

@@ -2,9 +2,13 @@ import { defineConfig } from "vitest/config"
 
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.ts"],
+    include: ["src/**/*.test.ts"],
+    typecheck: {
+      enabled: true,
+      include: ["src/**/*.test-d.ts"],
+    },
     coverage: {
-      reporter: ["text", "lcov"]
-    }
-  }
+      reporter: ["text", "lcov"],
+    },
+  },
 })

@@ -1,126 +1,139 @@
-import type { HelpersFactory } from "./builder"
-import { raw, type RuleExpression, type RuleOperand } from "./expression"
+import type {
+  RegisterHelper,
+  AnyDbNamespace,
+  AnyDbSchema,
+  RuleContextFor,
+  RuleExpression,
+  RuleOperand,
+  DataKeysFor,
+} from "./index"
 
 /**
- * Common authentication and authorization helper functions for Firestore Security Rules.
+ * Bundled authentication and ownership helpers that can be registered on a builder.
  *
- * Provides reusable helpers for common patterns like checking authentication,
- * JWT claims, ownership verification, and server timestamp validation.
+ * The helpers are intentionally small and compose with the core rule context.
+ * They cover the most common auth-related checks without changing the builder's
+ * type model or requiring extra setup beyond `withHelpers(...)`.
  *
  * @example
- * ```typescript
- * const rules = createFirestoreRules()
- *   .withHelpers(registerCommonHelpers)
- *   .rules((ns) => {
- *     ns.users(($) => ({
- *       read: $.if($.lib.isAuthenticated()),
- *       create: $.if($.lib.isAuthenticatedAndOwner($.params.userId))
- *     }))
- *   })
+ * ```ts
+ * const rules = createFirestoreRulesBuilder<{
+ *   users: DbCollection<{ ownerId: string; updatedAt: timestamp }>
+ * }>()
+ *   .withHelpers(commonFirestoreRulesHelpers)
+ *   .collection("users")
+ *   .rules(($) => ({
+ *     read: $.if($.isAuthenticated()),
+ *     update: $.and($.isOwner($.resource.data.ownerId, true), $.isServerTime("updatedAt")),
+ *   }))
  * ```
  */
-export interface CommonHelpers {
+export interface CommonHelpers<Db extends AnyDbSchema, Ns extends AnyDbNamespace> {
   /**
-   * Checks if a user is authenticated (has a valid JWT token with uid).
+   * Checks that the request is authenticated and exposes a `uid`.
    *
-   * @returns A rule expression that evaluates to true if authenticated
+   * @returns An expression that is truthy only when `request.auth.uid` exists.
    *
    * @example
-   * ```typescript
-   * ctx.if(ctx.lib.isAuthenticated())
+   * ```ts
+   * $.if($.isAuthenticated())
    * ```
    */
   isAuthenticated: () => RuleExpression
 
   /**
-   * Checks if a specific JWT token claim matches an expected value.
+   * Compares a JWT claim from `request.auth.token` with an expected value.
    *
-   * @param claim - The name of the JWT claim to check
-   * @param expected - The expected value of the claim
-   * @returns A rule expression that evaluates to true if the claim matches
+   * @param claim - Claim name or expression resolving to a claim key.
+   * @param expected - Expected claim value.
+   * @returns An equality expression over `request.auth.token`.
    *
    * @example
-   * ```typescript
-   * ctx.lib.hasClaim("admin", true)
-   * ctx.lib.hasClaim("role", "moderator")
+   * ```ts
+   * $.hasClaim("admin", true)
+   * $.hasClaim("role", "moderator")
    * ```
    */
-  hasClaim: (claim: RuleOperand, expected: RuleOperand) => RuleExpression
+  hasClaim: (
+    claim: RuleExpression | (keyof Db["meta"]["authClaims"] & string),
+    expected: RuleOperand,
+  ) => RuleExpression
 
   /**
-   * Checks if the authenticated user's UID matches the provided value.
+   * Compares `request.auth.uid` with the provided owner identifier.
    *
-   * @param uid - The UID to compare against
-   * @returns A rule expression that evaluates to true if UIDs match
+   * @param uid - Expected owner identifier.
+   * @param checkAuth - When true, also requires `isAuthenticated()` first.
+   * @returns An ownership check expression.
    *
    * @example
-   * ```typescript
-   * ctx.lib.isOwner($.params.userId)
-   * ctx.lib.isOwner($.resource.data.owner)
+   * ```ts
+   * $.isOwner($.params.userId)
+   * $.isOwner($.resource.data.owner, true) // also checks that user is authenticated
    * ```
    */
-  isOwner: (uid: RuleOperand) => RuleExpression
+  isOwner: (uid: RuleOperand, checkAuth?: boolean) => RuleExpression
 
   /**
-   * Checks if the user is authenticated AND is the owner of the resource.
+   * Verifies that a timestamp matches `request.time`.
    *
-   * @param uid - The expected owner UID
-   * @returns A rule expression that evaluates to true if authenticated and owner
+   * Passing a data key uses `request.resource.data[key]` as a shorthand, which
+   * only makes sense inside collection-scoped rule callbacks.
    *
-   * @example
-   * ```typescript
-   * ctx.lib.isAuthenticatedAndOwner($.resource.data.owner)
-   * ```
-   */
-  isAuthenticatedAndOwner: (uid: RuleOperand) => RuleExpression
-
-  /**
-   * Checks if a timestamp equals the server's current time (for update timestamps).
-   *
-   * @param timestamp - The timestamp to verify
-   * @returns A rule expression that evaluates to true if it's the server time
+   * @param timestamp - Timestamp expression or collection data key.
+   * @returns An equality expression against `request.time`.
    *
    * @example
-   * ```typescript
-   * ctx.lib.isServerTime($.request.resource.data.updatedAt)
+   * ```ts
+   * $.isServerTime($.request.resource.data.updatedAt)
+   * $.isServerTime("createdAt") // shorthand for $.isServerTime($.request.resource.data.createdAt)
    * ```
    */
-  isServerTime: (timestamp: RuleOperand) => RuleExpression
+  isServerTime: (timestamp: RuleExpression | DataKeysFor<Ns>) => RuleExpression
 }
 
 /**
- * Factory function that registers common auth helpers with the rules builder.
+ * Registers the bundled auth helpers on the current builder context.
  *
- * Use with {@link FirestoreRulesBuilder.withHelpers} to add authentication helpers
- * to your rule builder.
+ * The returned object is merged into the builder's helper library, while the
+ * registry callback is used only for helpers that should render as named
+ * Firestore rule functions.
  *
- * @param ctx - The rule context
- * @param register - The helper registration function
- * @returns An object containing the common helper functions
+ * @param context - Current typed rule context.
+ * @param register - Helper registrar shared by the builder tree.
+ * @returns A helper object that can be used in later `rules(...)` callbacks.
  *
  * @example
- * ```typescript
- * const rules = createFirestoreRules()
- *   .withHelpers(registerCommonHelpers)
+ * ```ts
+ * const rules = createFirestoreRulesBuilder()
+ *   .withHelpers(commonFirestoreRulesHelpers)
  * ```
  */
-export const registerCommonHelpers: HelpersFactory<CommonHelpers> = (ctx, register) => {
+export const commonFirestoreRulesHelpers = <Db extends AnyDbSchema, Ns extends AnyDbNamespace, Lib>(
+  context: RuleContextFor<Db, Ns, Lib>,
+  register: RegisterHelper,
+): CommonHelpers<Db, Ns> => {
   const isAuthenticated = register("isAuthenticated", [], () =>
-    ctx.and(ctx.isset(ctx.request.auth), ctx.isset(ctx.request.auth.uid)),
+    context.return(
+      context.and(context.isset(context.request.auth), context.isset(context.request.auth.uid)),
+    ),
   )
   const hasClaim = register("hasClaim", ["claim", "expected"], (arg) =>
-    ctx.eq(raw(`${ctx.request.auth.token}[${arg.claim}]`), arg.expected),
+    context.return(context.eq(context.request.auth.token.$prop(arg.claim), arg.expected)),
   )
-  const isOwner = (uid: RuleOperand) => ctx.eq(ctx.request.auth.uid, uid)
-  const isAuthenticatedAndOwner = register("isAuthenticatedAndOwner", ["uid"], (arg) =>
-    ctx.and(isAuthenticated(), isOwner(arg.uid)),
-  )
-  const isServerTime = (ts: RuleOperand) => ctx.eq(ts, ctx.server.time)
+  const isOwner = (uid: RuleOperand, checkAuth = false) =>
+    checkAuth
+      ? context.and(isAuthenticated(), context.eq(context.request.auth.uid, uid))
+      : context.eq(context.request.auth.uid, uid)
+  const isServerTime = (ts: RuleOperand | DataKeysFor<Ns>) =>
+    context.eq(
+      typeof ts === "string" ? context.request.resource.data[ts] : ts,
+      context.request.time,
+    )
   return {
     isAuthenticated,
     hasClaim,
     isOwner,
-    isAuthenticatedAndOwner,
     isServerTime,
   }
 }
