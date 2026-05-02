@@ -4,5 +4,11 @@
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["src/**/*.ts", "eslint.config.ts", "vite.config.ts", "vitest.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "eslint.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }

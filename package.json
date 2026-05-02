@@ -42,7 +42,7 @@
     "dev": "vite build --watch",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:tarball-integration": "node scripts/test-tarball-integration.mjs",
+    "test:tarball-integration": "tsx scripts/test-tarball-integration.ts",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.eslint.json --noEmit"
   },
@@ -54,6 +54,7 @@
     "globals": "^17",
     "jiti": "^2",
     "prettier": "^3",
+    "tsx": "^4",
     "typescript": "^6",
     "typescript-eslint": "^8",
     "vite": "^8",
