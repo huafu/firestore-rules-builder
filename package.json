@@ -1,5 +1,5 @@
 {
-  "name": "@huafu/firestore-rules-builder",
+  "name": "firestore-rules-dsl",
   "version": "0.1.0",
   "description": "Strongly typed DSL to generate Firebase Firestore Security Rules",
   "type": "module",
@@ -10,7 +10,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/huafu/firestore-rules-builder.git"
+    "url": "https://github.com/huafu/firestore-rules-dsl.git"
   },
   "keywords": [
     "firestore",
@@ -45,6 +45,7 @@
   "devDependencies": {
     "@eslint/js": "^10",
     "@types/node": "^22",
+    "@vitest/coverage-v8": "^4",
     "eslint": "^10",
     "globals": "^17",
     "jiti": "^2",
