@@ -42,6 +42,7 @@
     "dev": "vite build --watch",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:tarball-integration": "node scripts/test-tarball-integration.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.eslint.json --noEmit"
   },

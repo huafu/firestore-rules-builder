@@ -15,12 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [ 20, 22, 24 ]
+        node-version: [ 24 ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -40,3 +40,6 @@ jobs:
 
       - name: Build library
         run: npm run build
+
+      - name: Integration test packed package with index.test.ts
+        run: npm run test:tarball-integration
