@@ -39,6 +39,8 @@
   "scripts": {
     "build": "vite build",
     "clean": "rm -rf dist",
+    "commitlint": "commitlint --last --verbose",
+    "commitlint:branch": "commitlint --from origin/develop --to HEAD --verbose",
     "dev": "vite build --watch",
     "lint": "eslint .",
     "test": "vitest run",
@@ -47,6 +49,8 @@
     "typecheck": "tsc -p tsconfig.eslint.json --noEmit"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20",
+    "@commitlint/config-conventional": "^20",
     "@eslint/js": "^10",
     "@types/node": "^22",
     "@vitest/coverage-v8": "^4",
