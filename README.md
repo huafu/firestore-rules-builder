@@ -1,6 +1,12 @@
-# firestore-rules-dsl
+# Firestore Rules DSL
 
-Strongly typed TypeScript DSL for generating Firebase Firestore Security Rules.
+Type-safe builder for Firebase Firestore Security Rules.
+
+[![npm version](https://img.shields.io/npm/v/firestore-rules-dsl.svg)](https://www.npmjs.com/package/firestore-rules-dsl)
+[![npm downloads](https://img.shields.io/npm/dm/firestore-rules-dsl.svg)](https://www.npmjs.com/package/firestore-rules-dsl)
+[![CI](https://img.shields.io/github/actions/workflow/status/huafu/firestore-rules-builder/ci.yml?branch=develop&label=CI)](https://github.com/huafu/firestore-rules-builder/actions/workflows/ci.yml)
+[![Publish](https://img.shields.io/github/actions/workflow/status/huafu/firestore-rules-builder/publish.yml?label=Publish)](https://github.com/huafu/firestore-rules-builder/actions/workflows/publish.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 It lets you describe your Firestore schema once, write rules against a typed context, register reusable helper functions, and render a complete `firestore.rules` source file.
 
@@ -381,3 +387,7 @@ npm run test
 ## License
 
 MIT
+
+---
+
+Made with 💖 in TypeScript by Huafu from Thailand.
