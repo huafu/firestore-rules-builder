@@ -4,25 +4,51 @@ import type { expr, PrimitiveRuleValue, Expr, RuleExpression, RuleOperand } from
 import type { RegisterHelper } from "./helpers-registry"
 import type { ParamsProxy, PathProxy } from "./proxy"
 
+export type PrimitiveDbValue = Date | string | number | boolean | null
+
+type CastId<T> = T extends never
+  ? string
+  : IsAny<T> extends true
+    ? unknown
+    : IsUndefined<T> extends true
+      ? string
+      : T
+type CastData<T> = T extends never
+  ? {}
+  : IsAny<T> extends true
+    ? {}
+    : IsUndefined<T> extends true
+      ? {}
+      : T
+type CastChildren<T> = T extends never
+  ? never
+  : IsAny<T> extends true
+    ? never
+    : IsUndefined<T> extends true
+      ? never
+      : {
+          [K in keyof T]-?: T[K]
+        }
+
 export interface DbCollection<
-  Data extends Record<string, unknown> = Record<string, unknown>,
-  Children extends AnyDbNamespace | undefined = undefined,
-  Id extends string | undefined = undefined,
+  Data = Record<string, unknown>,
+  Children extends AnyDbNamespace = never,
+  Id extends string = string,
 > {
   /**
    * Optional explicit document identifier type exposed through `resource.id`.
    *
    * When omitted, document IDs default to `string`.
    */
-  id?: Id
+  id: CastId<Id>
   /**
    * Nested collections that can be reached below documents in this collection.
    */
-  children?: Children
+  namespace: CastChildren<Children>
   /**
    * Shape of the document data available through `resource.data` and request payloads.
    */
-  data: Data
+  data: CastData<Data>
 }
 
 /**
@@ -34,20 +60,12 @@ export interface DbMeta {
   authClaims?: Record<string, unknown>
 }
 
-/**
- * Alias used to model Firestore timestamps in schema declarations.
- *
- * The library treats timestamps as rule-level scalar values rather than `Date`
- * instances because generated Firestore rules operate on serialized values.
- */
-export type timestamp = number
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyDbCollection = DbCollection<any, any, any>
+export type AnyDbCollection = { id: any; namespace: any; data: any }
 
 export type DbNamespace<K extends string = string> = Record<K, AnyDbCollection>
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyDbNamespace = DbNamespace<any>
+
+export type AnyDbNamespace = DbNamespace
 
 /**
  * Top-level schema shape accepted by {@link createFirestoreRulesBuilder}.
@@ -76,7 +94,7 @@ type FullDbCollectionBase<
 > = {
   name: Key
   singular: Singularize<Key>
-  id: Default<Col["id"], string>
+  id: Col["id"]
   data: Col["data"]
   parents: Parents
 }
@@ -88,12 +106,9 @@ export type FullDbCollection<
   Key extends string,
   Col extends AnyDbCollection,
 > = FullDbCollectionBase<Parents, Key, Col> & {
-  children: IsUndefined<Col["children"]> extends true
+  namespace: Col["namespace"] extends never
     ? never
-    : FullDbNamespace<
-        [...Parents, FullDbCollectionBase<Parents, Key, Col>],
-        NonNullable<Col["children"]>
-      >
+    : FullDbNamespace<[...Parents, FullDbCollectionBase<Parents, Key, Col>], Col["namespace"]>
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,7 +209,7 @@ export type ParentLoadersFor<Ns extends AnyFullDbNamespace | AnyFullDbCollection
   // Parent helpers are keyed by collection name because the singular label is type-level only.
   [P in Ns["parents"][number] as P["name"]]: Prettify<
     RuleContextDbDocHelpers<P> &
-      (P["children"] extends never ? {} : RuleContextDbNsHelpers<P["children"]>)
+      (P["namespace"] extends never ? {} : RuleContextDbNsHelpers<P["namespace"]>)
   >
 }
 
@@ -213,7 +228,7 @@ export type ResourceKeysFor<Col extends AnyFullDbCollectionBase> = keyof Col["da
  */
 export type CollectionFor<Ns extends AnyFullDbNamespace | AnyFullDbCollectionBase> =
   Ns extends AnyFullDbCollectionBase
-    ? Omit<Ns, "children">
+    ? Omit<Ns, "namespace">
     : Ns extends AnyFullDbNamespace
       ? Ns["parents"] extends readonly []
         ? never
@@ -328,9 +343,9 @@ export type RuleContextDbNsHelpers<Ns extends AnyFullDbNamespace> = {
     id: RuleOperand,
   ) => Prettify<
     RuleContextDbDocHelpers<Ns["collections"][K]> &
-      (Ns["collections"][K]["children"] extends never
+      (Ns["collections"][K]["namespace"] extends never
         ? {}
-        : RuleContextDbNsHelpers<Ns["collections"][K]["children"]>)
+        : RuleContextDbNsHelpers<Ns["collections"][K]["namespace"]>)
   >
 }
 
@@ -493,7 +508,7 @@ export type FirestoreRulesBuilderMap<
 > = {
   [K in keyof Ns["collections"] & string]: FirestoreChildRulesBuilder<
     Db,
-    Ns["collections"][K]["children"],
+    Ns["collections"][K]["namespace"],
     Ns["collections"][K],
     Lib
   >
@@ -578,6 +593,7 @@ export type Singularize<T extends string> =
  * collection names such as `users`.
  */
 export const singularize = <T extends string>(str: T): Singularize<T> => {
+  if (str === "status") return "status" as Singularize<T>
   if (str === "people") return "person" as Singularize<T>
   if (str === "children") return "child" as Singularize<T>
   if (str === "criteria") return "criterion" as Singularize<T>

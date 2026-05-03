@@ -31,30 +31,29 @@ import {
   commonFirestoreRulesHelpers,
   createFirestoreRulesBuilder,
   type DbCollection,
-  type timestamp,
 } from "firestore-rules-dsl"
 
 type Schema = {
   users: DbCollection<{
     name: string
     email: string
-    createdAt: timestamp
-    updatedAt: timestamp
+    createdAt: Date
+    updatedAt: Date
   }>
   posts: DbCollection<
     {
       title: string
       content: string
       authorId: string
-      createdAt: timestamp
-      updatedAt: timestamp
+      createdAt: Date
+      updatedAt: Date
     },
     {
       comments: DbCollection<{
         text: string
         commenterId: string
-        createdAt: timestamp
-        updatedAt: timestamp
+        createdAt: Date
+        updatedAt: Date
       }>
     }
   >
@@ -138,20 +137,20 @@ Use `DbCollection<Data, Children, Id>` to describe a collection.
 type BlogSchema = {
   users: DbCollection<{
     displayName: string
-    createdAt: timestamp
+    createdAt: Date
   }>
   posts: DbCollection<
     {
       title: string
       authorId: string
-      createdAt: timestamp
-      updatedAt: timestamp
+      createdAt: Date
+      updatedAt: Date
     },
     {
       comments: DbCollection<{
         text: string
         commenterId: string
-        createdAt: timestamp
+        createdAt: Date
       }>
     }
   >
@@ -164,7 +163,35 @@ type BlogSchema = {
 
 `Id` lets you override the type exposed through `resource.id`. If omitted, it defaults to `string`.
 
-`timestamp` is exported as a convenience alias for Firestore timestamp-like scalar values in rules.
+## Typesaurus Integration
+
+If you already define your Firestore schema with [Typesaurus](https://typesaurus.com/), you can reuse it directly instead of re-declaring a `DbCollection` schema by hand.
+
+Install `typesaurus` as a dependency, then import `OfTypesaurus` from the dedicated subpath (keeping the peer dependency optional for projects that don't use Typesaurus):
+
+```ts
+import { schema, type Typesaurus } from "typesaurus"
+import type { OfTypesaurus } from "firestore-rules-dsl/typesaurus"
+import { createFirestoreRulesBuilder } from "firestore-rules-dsl"
+
+const db = schema(($) => ({
+  users: $.collection<User>(),
+  posts: $.collection<Post>().sub({
+    comments: $.collection<Comment>(),
+  }),
+}))
+
+// Pass the db instance directly:
+const builder = createFirestoreRulesBuilder<OfTypesaurus<typeof db>>()
+
+// Or pass the inferred schema type:
+type Schema = Typesaurus.Schema<typeof db>
+const builder2 = createFirestoreRulesBuilder<OfTypesaurus<Schema>>()
+```
+
+`OfTypesaurus` accepts either the database instance (`typeof db`) or the schema type (`Typesaurus.Schema<typeof db>`) and converts it into the `DbCollection`-based format expected by the builder, including nested subcollections and typed document IDs.
+
+Because the integration lives in a separate subpath (`firestore-rules-dsl/typesaurus`), `typesaurus` is declared as an **optional peer dependency** — projects that don't use Typesaurus are not affected.
 
 ## Builder Model
 
@@ -359,12 +386,11 @@ Common failure cases include:
 
 ## Public Exports
 
-Main exports:
+Main exports (`firestore-rules-dsl`):
 
 - `createFirestoreRulesBuilder`
 - `commonFirestoreRulesHelpers`
 - `DbCollection`
-- `timestamp`
 - `RuleContextFor`
 - `RuleExpression`
 - `RuleOperand`
@@ -374,6 +400,10 @@ Main exports:
 - `AnyDbNamespace`
 - `AnyDbSchema`
 - `RuleError`
+
+Typesaurus integration exports (`firestore-rules-dsl/typesaurus`):
+
+- `OfTypesaurus`
 
 ## Development
 

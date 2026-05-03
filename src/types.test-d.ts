@@ -37,7 +37,7 @@ type Schema = {
 type Db = FullDbSchema<Schema>
 type RootNs = Db
 type UsersCol = Db["collections"]["users"]
-type UsersNs = UsersCol["children"]
+type UsersNs = UsersCol["namespace"]
 type PostsCol = UsersNs["collections"]["posts"]
 
 describe("types", () => {

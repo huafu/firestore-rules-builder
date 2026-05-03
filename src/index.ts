@@ -12,7 +12,6 @@ import type { DbMeta, DbSchema, FullDbSchema, ParentNamesFor } from "./types"
  */
 export type {
   DbCollection,
-  timestamp,
   RuleContextFor,
   AnyFullDbNamespace as AnyDbNamespace,
   AnyFullDbSchema as AnyDbSchema,

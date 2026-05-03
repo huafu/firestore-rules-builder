@@ -18,7 +18,7 @@ import type {
  * @example
  * ```ts
  * const rules = createFirestoreRulesBuilder<{
- *   users: DbCollection<{ ownerId: string; updatedAt: timestamp }>
+ *   users: DbCollection<{ ownerId: string; updatedAt: Date }>
  * }>()
  *   .withHelpers(commonFirestoreRulesHelpers)
  *   .collection("users")
