@@ -70,15 +70,14 @@ describe("createFirestoreRulesBuilder", () => {
           read: $.if($.isAuthenticated()),
           create: $.if($.isAuthenticated()),
           update: $.if(
-            $.and(
-              $.isOwner($.resource.data.authorId, true),
-              $.hasOnlyModified(["title", "content", "updatedAt"]),
-              $.isServerTime("updatedAt"),
-            ),
+            $.isOwner($.resource.data.authorId, true),
+            $.hasOnlyModified(["title", "content", "updatedAt"]),
+            $.isServerTime("updatedAt"),
           ),
           delete: $.if(
-            $.or(
-              $.isOwner($.resource.data.authorId, true),
+            $.isAuthenticated(),
+            $.orBlock(
+              $.isOwner($.resource.data.authorId),
               $.eq($.request.auth.token.admin, $.true),
             ),
           ),
@@ -88,14 +87,13 @@ describe("createFirestoreRulesBuilder", () => {
             read: $.if($.isAuthenticated()),
             create: $.if($.isAuthenticated()),
             update: $.if(
-              $.and(
-                $.isOwner($.resource.data.commenterId, true),
-                $.hasOnlyModified(["text", "updatedAt"]),
-                $.isServerTime("updatedAt"),
-              ),
+              $.isOwner($.resource.data.commenterId, true),
+              $.hasOnlyModified(["text", "updatedAt"]),
+              $.isServerTime("updatedAt"),
             ),
             delete: $.if(
-              $.or($.isOwner($.resource.data.commenterId, true), $.hasClaim("admin", true)),
+              $.isAuthenticated(),
+              $.orBlock($.isOwner($.resource.data.commenterId, true), $.hasClaim("admin", true)),
             ),
           }))
         })
