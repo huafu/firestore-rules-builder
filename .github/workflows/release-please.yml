@@ -20,3 +20,4 @@ jobs:
         with:
           target-branch: develop
           config-file: release-please-config.json
+          release-type: node
