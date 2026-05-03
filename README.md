@@ -13,7 +13,7 @@ It lets you describe your Firestore schema once, write rules against a typed con
 ## Install
 
 ```bash
-npm install firestore-rules-dsl
+pnpm add firestore-rules-dsl
 ```
 
 ## What You Get
@@ -408,10 +408,10 @@ Typesaurus integration exports (`firestore-rules-dsl/typesaurus`):
 ## Development
 
 ```bash
-npm run build
-npm run lint
-npm run typecheck
-npm run test
+pnpm run build
+pnpm run lint
+pnpm run typecheck
+pnpm run test
 ```
 
 ## License
