@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/huafu/firestore-rules-dsl/compare/v0.2.1...v0.3.0) (2026-05-03)
+
+
+### Features
+
+* ✨ variadic if/unless + auth claims fix ([#7](https://github.com/huafu/firestore-rules-dsl/issues/7)) ([f9ea4ff](https://github.com/huafu/firestore-rules-dsl/commit/f9ea4ffb7e092276cf238ae9d76dcc5df0d4a1e0))
+
 ## [0.2.1](https://github.com/huafu/firestore-rules-dsl/compare/v0.2.0...v0.2.1) (2026-05-03)
 
 
