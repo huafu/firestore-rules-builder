@@ -54,10 +54,7 @@ export interface CommonHelpers<Db extends AnyDbSchema, Ns extends AnyDbNamespace
    * $.hasClaim("role", "moderator")
    * ```
    */
-  hasClaim: (
-    claim: RuleExpression | (keyof Db["meta"]["authClaims"] & string),
-    expected: RuleOperand,
-  ) => RuleExpression
+  hasClaim: (claim: RuleExpression | ClaimKeyFor<Db>, expected: RuleOperand) => RuleExpression
 
   /**
    * Compares `request.auth.uid` with the provided owner identifier.
@@ -137,3 +134,7 @@ export const commonFirestoreRulesHelpers = <Db extends AnyDbSchema, Ns extends A
     isServerTime,
   }
 }
+
+type ClaimKeyFor<Db extends AnyDbSchema> = [keyof Db["meta"]["authClaims"] & string] extends [never]
+  ? string
+  : keyof Db["meta"]["authClaims"] & string

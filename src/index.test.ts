@@ -40,15 +40,11 @@ type Schema = {
   >
 }
 
-const createBuilder = () =>
-  createFirestoreRulesBuilder<
-    Schema,
-    {
-      authClaims: {
-        admin?: boolean
-      }
-    }
-  >()
+interface CustomClaims {
+  admin?: boolean
+}
+
+const createBuilder = () => createFirestoreRulesBuilder<Schema, { authClaims: CustomClaims }>()
 
 let builder: ReturnType<typeof createBuilder>
 
