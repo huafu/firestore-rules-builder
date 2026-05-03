@@ -34,6 +34,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./typesaurus": {
+      "types": "./dist/typesaurus.d.ts"
     }
   },
   "scripts": {
@@ -52,17 +55,26 @@
     "@commitlint/cli": "^20",
     "@commitlint/config-conventional": "^20",
     "@eslint/js": "^10",
-    "@types/node": "^22",
+    "@types/node": "^24",
     "@vitest/coverage-v8": "^4",
     "eslint": "^10",
     "globals": "^17",
     "jiti": "^2",
     "prettier": "^3",
     "tsx": "^4",
+    "typesaurus": "^10",
     "typescript": "^6",
     "typescript-eslint": "^8",
     "vite": "^8",
     "vite-plugin-dts": "^4",
     "vitest": "^4"
+  },
+  "peerDependencies": {
+    "typesaurus": "^10"
+  },
+  "peerDependenciesMeta": {
+    "typesaurus": {
+      "optional": true
+    }
   }
 }
