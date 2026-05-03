@@ -388,10 +388,10 @@ export interface RuleContextBase {
   always(): RuleExpression<"if">
   /** Shorthand for a deny expression equivalent to if false. */
   never(): RuleExpression<"if">
-  /** Pass-through helper that marks a condition as an allow expression. */
-  if(condition: RuleOperand): RuleExpression<"if">
-  /** Negated allow helper equivalent to if not(condition). */
-  unless(condition: RuleOperand): RuleExpression<"if">
+  /** Pass-through helper that marks a condition as an allow expression, or combines multiple conditions with logical AND. */
+  if(...conditions: [RuleOperand, ...(readonly RuleOperand[])]): RuleExpression<"if">
+  /** Negated allow helper equivalent to if not(condition), or combines multiple conditions with logical OR. */
+  unless(...conditions: [RuleOperand, ...(readonly RuleOperand[])]): RuleExpression<"if">
   /** Joins multiple conditions with logical AND. */
   and(...conditions: [RuleOperand, ...(readonly RuleOperand[])]): RuleExpression<"and">
   /** Wraps an AND expression in parentheses for explicit grouping. */
@@ -449,9 +449,9 @@ export interface RuleContextBase {
   /** Less-than-or-equal comparison helper (<=). */
   lte(left: RuleOperand, right: RuleOperand): RuleExpression<"lte">
   /** Wraps an expression in parentheses unless already parenthesized. */
-  parens(condition: RuleOperand): RuleExpression<"parens">
+  parens(condition: RuleOperand, nl?: boolean): RuleExpression<"parens">
   /** Joins a list of operands with a custom separator expression. */
-  join(separator: string, parts: readonly RuleOperand[]): RuleExpression<"join">
+  join(separator: string, parts: readonly RuleOperand[], nl?: boolean): RuleExpression<"join">
 }
 
 export type RuleContextFor<

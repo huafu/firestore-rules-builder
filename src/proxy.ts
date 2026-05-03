@@ -16,7 +16,7 @@ import type {
 
 type ProxyValue<T> = T extends PrimitiveRuleValue
   ? RuleExpression
-  : T extends Record<string, unknown> | Array<unknown>
+  : T extends object
     ? PathProxy<T>
     : RuleExpression
 

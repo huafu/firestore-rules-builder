@@ -79,7 +79,15 @@ const packTarball = () => {
 
 const main = () => {
   let tarballPath: string | undefined
-  const options = { cwd: integrationDir, encoding: "utf8" } as const
+  const options = {
+    cwd: integrationDir,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      // Keep this temporary integration project from mutating the repository lockfile.
+      npm_config_lockfile: "false",
+    },
+  } as const
 
   try {
     tarballPath = packTarball()

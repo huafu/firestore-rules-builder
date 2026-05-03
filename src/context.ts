@@ -1,4 +1,4 @@
-import { operand, expr, RuleExpression, type RuleOperand, indentFor } from "./expression"
+import { operand, expr, RuleExpression, type RuleOperand } from "./expression"
 import { createDbHelpersProxy, createParamsProxy, createPathProxy } from "./proxy"
 import {
   singularize,
@@ -30,13 +30,17 @@ export const createRuleContextBase = (): RuleContextBase => {
     return: (value) => expr("return")`return ${operand(value)};`,
     always: () => ctx.if(ctx.true),
     never: () => ctx.if(ctx.false),
-    if: (condition) => expr("if")(operand(condition)),
-    unless: (condition) => ctx.if(ctx.not(condition)),
+    if: (...condition) =>
+      expr("if")(condition.length === 1 ? operand(condition[0]) : ctx.andBlock(...condition)),
+    unless: (...condition) =>
+      condition.length === 1
+        ? ctx.if(ctx.not(condition[0]))
+        : ctx.if(ctx.not(ctx.orBlock(...condition))),
     isset: (value) => expr("isset")(ctx.neq(value, ctx.null)),
-    and: (...conditions) => expr("and")(ctx.join(`\n${indentFor(1)}&& `, conditions)),
-    andBlock: (...conditions) => ctx.parens(ctx.and(...conditions)),
-    or: (...conditions) => expr("or")(ctx.join(`\n${indentFor(1)}|| `, conditions)),
-    orBlock: (...conditions) => ctx.parens(ctx.or(...conditions)),
+    and: (...conditions) => expr("and")(ctx.join(` && `, conditions)),
+    andBlock: (...conditions) => ctx.parens(expr("and")(ctx.join(`&& `, conditions, true)), true),
+    or: (...conditions) => expr("or")(ctx.join(` || `, conditions)),
+    orBlock: (...conditions) => ctx.parens(expr("or")(ctx.join(`|| `, conditions, true)), true),
     ternary: (condition, trueExpr, falseExpr) =>
       expr("ternary")`${operand(condition)} ? ${operand(trueExpr)} : ${operand(falseExpr)}`,
     select: (...cases) => {
@@ -66,17 +70,27 @@ export const createRuleContextBase = (): RuleContextBase => {
       return ctx.ternary(condition, thenPart, elsePart)
     },
     default: (value, defaultValue) => ctx.ternary(ctx.neq(value, ctx.null), value, defaultValue),
-    parens: (op) => {
+    parens: (op, nl = false) => {
       const e = operand(op)
       if (RuleExpression.is(e, "parens")) return e
-      return expr("parens")`(${e})`
+      if (!nl) return expr("parens")`(${e})`
+      return expr("parens")((opt) => {
+        return `(\n${RuleExpression.toString(e, { ...opt, indentationLevel: 1 })}\n)`
+      })
     },
-    join: (separator, parts) =>
-      expr("join")(() => {
-        const items = parts.map(operand)
-        if (items.length === 0) return ""
-        if (items.length === 1) return items[0] as RuleExpression
-        return items.join(separator)
+    join: (separator, parts, nl = false) =>
+      expr("join")((opt) => {
+        if (parts.length === 0) return ""
+        if (parts.length === 1) return operand(parts[0] as RuleExpression)
+        const sep = nl ? `\n${separator.trimStart()}` : separator
+        return parts
+          .map((s) =>
+            RuleExpression.toString(operand(s), {
+              ...opt,
+              indentationLevel: 0,
+            }).trimStart(),
+          )
+          .join(sep)
       }),
   }
   return ctx
