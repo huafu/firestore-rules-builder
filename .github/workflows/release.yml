@@ -1,21 +1,19 @@
-name: Publish to npm
+name: Release & Publish
 
 on:
-  release:
-    types:
-      - published
+  push:
+    branches:
+      - develop
   workflow_dispatch:
 
 permissions:
-  id-token: write # Required for OIDC
-  contents: read
-
-concurrency:
-  group: npm-publish-${{ github.ref }}
-  cancel-in-progress: false
+  id-token: write
+  contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
-  publish:
+  release-please:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -48,17 +46,20 @@ jobs:
       - name: Integration test
         run: pnpm run test:tarball-integration
 
-      - name: Verify tag matches package version
-        if: github.event_name == 'release'
-        run: |
-          RAW_TAG="${{ github.event.release.tag_name }}"
+      - name: Run Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          target-branch: develop
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
-          TAG_VERSION="${RAW_TAG#v}"
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)."
-            exit 1
-          fi
+      - name: Checkout release tag
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
 
       - name: Publish package
+        if: ${{ steps.release.outputs.release_created == 'true' }}
         run: pnpm publish --no-git-checks
