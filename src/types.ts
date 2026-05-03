@@ -57,7 +57,19 @@ export interface DbCollection<
  * The primary use is refining the shape of `request.auth.token` claims.
  */
 export interface DbMeta {
-  authClaims?: Record<string, unknown>
+  authClaims?: object
+}
+
+type NormalizeAuthClaims<T> = [T] extends [never]
+  ? Record<string, unknown>
+  : T extends object
+    ? [keyof T & string] extends [never]
+      ? Record<string, unknown>
+      : T
+    : Record<string, unknown>
+
+export type FullDbMeta<Meta extends DbMeta> = {
+  authClaims: NormalizeAuthClaims<Exclude<Meta["authClaims"], undefined>>
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -132,10 +144,6 @@ export type FullDbNamespace<
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyFullDbNamespace = FullDbNamespace<any, any>
-
-export type FullDbMeta<Meta extends DbMeta> = {
-  authClaims: Exclude<Meta["authClaims"], undefined>
-}
 
 /**
  * Fully expanded schema used throughout builder, context, and proxy typing.
