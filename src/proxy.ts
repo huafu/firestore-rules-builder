@@ -1,5 +1,12 @@
 import { RuleError } from "./context"
-import { expr, operand, primitive, RuleExpression, type RuleOperand } from "./expression"
+import {
+  expr,
+  operand,
+  primitive,
+  RuleExpression,
+  type PrimitiveRuleValue,
+  type RuleOperand,
+} from "./expression"
 import type {
   AnyFullDbCollectionBase,
   AnyFullDbNamespace,
@@ -7,11 +14,11 @@ import type {
   RuleContextDbNsHelpers,
 } from "./types"
 
-type RuleObject = Record<string, unknown> | Array<unknown>
-
-type ProxyValue<T> = T extends Record<string, unknown> | Array<unknown>
-  ? PathProxy<Extract<T, RuleObject>>
-  : RuleExpression
+type ProxyValue<T> = T extends PrimitiveRuleValue
+  ? RuleExpression
+  : T extends Record<string, unknown> | Array<unknown>
+    ? PathProxy<T>
+    : RuleExpression
 
 /**
  * Typed property proxy over a Firestore rules path.

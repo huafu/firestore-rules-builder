@@ -2,7 +2,6 @@ import {
   commonFirestoreRulesHelpers,
   createFirestoreRulesBuilder,
   type DbCollection,
-  type timestamp,
 } from "./index"
 import { describe, it, expect, beforeEach } from "vitest"
 
@@ -10,30 +9,30 @@ type Schema = {
   users: DbCollection<{
     name: string
     email: string
-    createdAt: timestamp
-    updatedAt: timestamp
+    createdAt: Date
+    updatedAt: Date
   }>
   posts: DbCollection<
     {
       title: string
       content: string
       authorId: string
-      createdAt: timestamp
-      updatedAt: timestamp
+      createdAt: Date
+      updatedAt: Date
     },
     {
       comments: DbCollection<
         {
           text: string
           commenterId: string
-          createdAt: timestamp
-          updatedAt: timestamp
+          createdAt: Date
+          updatedAt: Date
         },
         {
           likes: DbCollection<{
             userId: string
-            createdAt: timestamp
-            updatedAt: timestamp
+            createdAt: Date
+            updatedAt: Date
           }>
         }
       >

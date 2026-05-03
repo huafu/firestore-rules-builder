@@ -118,7 +118,7 @@ export class FirestoreRulesBuilder<
   protected _childBuilders: Partial<{
     [K in keyof Ns["collections"] & string]: FirestoreRulesBuilder<
       Db,
-      Ns["collections"][K]["children"],
+      Ns["collections"][K]["namespace"],
       Ns["collections"][K],
       Lib
     >
@@ -174,10 +174,10 @@ export class FirestoreRulesBuilder<
 
   protected childBuilder<K extends keyof Ns["collections"] & string>(
     collection: K,
-  ): FirestoreChildRulesBuilder<Db, Ns["collections"][K]["children"], Ns["collections"][K], Lib> {
+  ): FirestoreChildRulesBuilder<Db, Ns["collections"][K]["namespace"], Ns["collections"][K], Lib> {
     return (this._childBuilders[collection] ??= new FirestoreRulesBuilder(
       this._registry,
-      [...this._path, collection] as ParentNamesFor<Ns["collections"][K]["children"]>,
+      [...this._path, collection] as ParentNamesFor<Ns["collections"][K]["namespace"]>,
       this._context.base,
       this.lib,
     ))
@@ -257,7 +257,7 @@ export class FirestoreRulesBuilder<
    */
   public collection<K extends keyof Ns["collections"] & string>(
     collection: K,
-  ): FirestoreChildRulesBuilder<Db, Ns["collections"][K]["children"], Ns["collections"][K], Lib> {
+  ): FirestoreChildRulesBuilder<Db, Ns["collections"][K]["namespace"], Ns["collections"][K], Lib> {
     return this.childBuilder(collection)
   }
 

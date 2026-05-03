@@ -2,15 +2,12 @@ import { execSync, type ExecSyncOptionsWithStringEncoding } from "node:child_pro
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 
-type NpmPackResult = {
+type PnpmPackResult = {
   filename: string
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
-const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value)
-
-const parseJson = (value: string): unknown => JSON.parse(value) as unknown
 
 const repoRoot = process.cwd()
 const tmpDir = path.join(repoRoot, ".tmp")
@@ -53,46 +50,51 @@ const copyIntegrationFixtures = () => {
   )
 
   writeFileSync(targetTestPath, patchedTestSource)
-}
 
-const parseNpmPackOutput = (json: string): NpmPackResult => {
-  const parsed = parseJson(json)
-
-  if (!isUnknownArray(parsed) || parsed.length === 0) {
-    throw new Error("Unable to determine tarball filename from npm pack output")
-  }
-
-  const firstResult = parsed[0]
-  if (!isRecord(firstResult)) {
-    throw new Error("Unable to determine tarball filename from npm pack output")
-  }
-
-  const filename = firstResult["filename"]
-  if (typeof filename !== "string") {
-    throw new Error("Unable to determine tarball filename from npm pack output")
-  }
-
-  return { filename }
+  const subpathTypecheckPath = path.join(integrationSrcDir, "typesaurus-subpath.typecheck.ts")
+  writeFileSync(
+    subpathTypecheckPath,
+    [
+      'import type { Typesaurus } from "typesaurus"',
+      'import type { OfTypesaurus } from "firestore-rules-dsl/typesaurus"',
+      "",
+      "// Smoke test: the subpath type export resolves and composes with Typesaurus types.",
+      "type _Smoke = OfTypesaurus<Typesaurus.Schema<any>>",
+      "",
+    ].join("\n"),
+  )
 }
 
 const packTarball = () => {
-  const packOutput = runText("npm pack --json", { cwd: repoRoot, encoding: "utf8" })
-  const { filename } = parseNpmPackOutput(packOutput)
+  const output = runText("pnpm pack --json", { cwd: repoRoot, encoding: "utf8" })
+  const parsed = JSON.parse(output) as unknown
+
+  if (!isRecord(parsed) || typeof parsed["filename"] !== "string") {
+    throw new Error("Unable to determine tarball filename from pnpm pack output")
+  }
+
+  const { filename } = parsed as PnpmPackResult
   return path.join(repoRoot, filename)
 }
 
 const main = () => {
   let tarballPath: string | undefined
+  const options = { cwd: integrationDir, encoding: "utf8" } as const
 
   try {
     tarballPath = packTarball()
 
     copyIntegrationFixtures()
 
-    run("npm init -y", { cwd: integrationDir, encoding: "utf8" })
-    run(`npm install "${tarballPath}" --save`, { cwd: integrationDir, encoding: "utf8" })
-    run("npm install vitest@^4 --save-dev", { cwd: integrationDir, encoding: "utf8" })
-    run("npx vitest run src/index.test.ts", { cwd: integrationDir, encoding: "utf8" })
+    run("pnpm init", options)
+    run(`pnpm add "file:${tarballPath}"`, options)
+    run("pnpm add -D vitest@^4", options)
+    run("pnpm exec vitest run src/index.test.ts", options)
+    run("pnpm add -D typesaurus@^10 typescript@^6", options)
+    run(
+      "pnpm exec tsc --ignoreConfig --noEmit --skipLibCheck --moduleResolution bundler --module esnext src/typesaurus-subpath.typecheck.ts",
+      options,
+    )
   } finally {
     rmSync(tmpDir, { recursive: true, force: true })
 

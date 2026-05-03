@@ -1,13 +1,19 @@
-# firestore-rules-dsl
+# Firestore Rules DSL
 
-Strongly typed TypeScript DSL for generating Firebase Firestore Security Rules.
+Type-safe builder for Firebase Firestore Security Rules.
+
+[![npm version](https://img.shields.io/npm/v/firestore-rules-dsl.svg)](https://www.npmjs.com/package/firestore-rules-dsl)
+[![npm downloads](https://img.shields.io/npm/dm/firestore-rules-dsl.svg)](https://www.npmjs.com/package/firestore-rules-dsl)
+[![CI](https://img.shields.io/github/actions/workflow/status/huafu/firestore-rules-builder/ci.yml?branch=develop&label=CI)](https://github.com/huafu/firestore-rules-builder/actions/workflows/ci.yml)
+[![Publish](https://img.shields.io/github/actions/workflow/status/huafu/firestore-rules-builder/publish.yml?label=Publish)](https://github.com/huafu/firestore-rules-builder/actions/workflows/publish.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 It lets you describe your Firestore schema once, write rules against a typed context, register reusable helper functions, and render a complete `firestore.rules` source file.
 
 ## Install
 
 ```bash
-npm install firestore-rules-dsl
+pnpm add firestore-rules-dsl
 ```
 
 ## What You Get
@@ -25,30 +31,29 @@ import {
   commonFirestoreRulesHelpers,
   createFirestoreRulesBuilder,
   type DbCollection,
-  type timestamp,
 } from "firestore-rules-dsl"
 
 type Schema = {
   users: DbCollection<{
     name: string
     email: string
-    createdAt: timestamp
-    updatedAt: timestamp
+    createdAt: Date
+    updatedAt: Date
   }>
   posts: DbCollection<
     {
       title: string
       content: string
       authorId: string
-      createdAt: timestamp
-      updatedAt: timestamp
+      createdAt: Date
+      updatedAt: Date
     },
     {
       comments: DbCollection<{
         text: string
         commenterId: string
-        createdAt: timestamp
-        updatedAt: timestamp
+        createdAt: Date
+        updatedAt: Date
       }>
     }
   >
@@ -132,20 +137,20 @@ Use `DbCollection<Data, Children, Id>` to describe a collection.
 type BlogSchema = {
   users: DbCollection<{
     displayName: string
-    createdAt: timestamp
+    createdAt: Date
   }>
   posts: DbCollection<
     {
       title: string
       authorId: string
-      createdAt: timestamp
-      updatedAt: timestamp
+      createdAt: Date
+      updatedAt: Date
     },
     {
       comments: DbCollection<{
         text: string
         commenterId: string
-        createdAt: timestamp
+        createdAt: Date
       }>
     }
   >
@@ -158,7 +163,35 @@ type BlogSchema = {
 
 `Id` lets you override the type exposed through `resource.id`. If omitted, it defaults to `string`.
 
-`timestamp` is exported as a convenience alias for Firestore timestamp-like scalar values in rules.
+## Typesaurus Integration
+
+If you already define your Firestore schema with [Typesaurus](https://typesaurus.com/), you can reuse it directly instead of re-declaring a `DbCollection` schema by hand.
+
+Install `typesaurus` as a dependency, then import `OfTypesaurus` from the dedicated subpath (keeping the peer dependency optional for projects that don't use Typesaurus):
+
+```ts
+import { schema, type Typesaurus } from "typesaurus"
+import type { OfTypesaurus } from "firestore-rules-dsl/typesaurus"
+import { createFirestoreRulesBuilder } from "firestore-rules-dsl"
+
+const db = schema(($) => ({
+  users: $.collection<User>(),
+  posts: $.collection<Post>().sub({
+    comments: $.collection<Comment>(),
+  }),
+}))
+
+// Pass the db instance directly:
+const builder = createFirestoreRulesBuilder<OfTypesaurus<typeof db>>()
+
+// Or pass the inferred schema type:
+type Schema = Typesaurus.Schema<typeof db>
+const builder2 = createFirestoreRulesBuilder<OfTypesaurus<Schema>>()
+```
+
+`OfTypesaurus` accepts either the database instance (`typeof db`) or the schema type (`Typesaurus.Schema<typeof db>`) and converts it into the `DbCollection`-based format expected by the builder, including nested subcollections and typed document IDs.
+
+Because the integration lives in a separate subpath (`firestore-rules-dsl/typesaurus`), `typesaurus` is declared as an **optional peer dependency** — projects that don't use Typesaurus are not affected.
 
 ## Builder Model
 
@@ -353,12 +386,11 @@ Common failure cases include:
 
 ## Public Exports
 
-Main exports:
+Main exports (`firestore-rules-dsl`):
 
 - `createFirestoreRulesBuilder`
 - `commonFirestoreRulesHelpers`
 - `DbCollection`
-- `timestamp`
 - `RuleContextFor`
 - `RuleExpression`
 - `RuleOperand`
@@ -369,15 +401,23 @@ Main exports:
 - `AnyDbSchema`
 - `RuleError`
 
+Typesaurus integration exports (`firestore-rules-dsl/typesaurus`):
+
+- `OfTypesaurus`
+
 ## Development
 
 ```bash
-npm run build
-npm run lint
-npm run typecheck
-npm run test
+pnpm run build
+pnpm run lint
+pnpm run typecheck
+pnpm run test
 ```
 
 ## License
 
 MIT
+
+---
+
+Made with 💖 in TypeScript by Huafu from Thailand.

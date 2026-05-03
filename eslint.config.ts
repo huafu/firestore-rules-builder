@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint"
 
 export default defineConfig(
   {
-    ignores: ["dist/**", "node_modules/**", "coverage/**"],
+    ignores: ["dist/**", "node_modules/**", "coverage/**", "commitlint.config.cjs"],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
@@ -30,7 +30,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["tests/**/*.ts", "scripts/**/*.ts", "*.config.ts"],
+    files: ["src/**/*.test.ts", "scripts/**/*.ts", "*.config.ts"],
     languageOptions: {
       parserOptions: {
         project: "./tsconfig.eslint.json",
@@ -49,6 +49,11 @@ export default defineConfig(
       ],
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
     },
   },
 )
