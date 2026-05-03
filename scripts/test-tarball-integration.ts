@@ -53,6 +53,19 @@ const copyIntegrationFixtures = () => {
   )
 
   writeFileSync(targetTestPath, patchedTestSource)
+
+  const subpathTypecheckPath = path.join(integrationSrcDir, "typesaurus-subpath.typecheck.ts")
+  writeFileSync(
+    subpathTypecheckPath,
+    [
+      'import type { Typesaurus } from "typesaurus"',
+      'import type { OfTypesaurus } from "firestore-rules-dsl/typesaurus"',
+      "",
+      "// Smoke test: the subpath type export resolves and composes with Typesaurus types.",
+      "type _Smoke = OfTypesaurus<Typesaurus.Schema<any>>",
+      "",
+    ].join("\n"),
+  )
 }
 
 const parseNpmPackOutput = (json: string): NpmPackResult => {
@@ -93,6 +106,17 @@ const main = () => {
     run(`npm install "${tarballPath}" --save`, { cwd: integrationDir, encoding: "utf8" })
     run("npm install vitest@^4 --save-dev", { cwd: integrationDir, encoding: "utf8" })
     run("npx vitest run src/index.test.ts", { cwd: integrationDir, encoding: "utf8" })
+    run("npm install typesaurus@^10 typescript@^6 --save-dev", {
+      cwd: integrationDir,
+      encoding: "utf8",
+    })
+    run(
+      "npx tsc --ignoreConfig --noEmit --skipLibCheck --moduleResolution bundler --module esnext src/typesaurus-subpath.typecheck.ts",
+      {
+        cwd: integrationDir,
+        encoding: "utf8",
+      },
+    )
   } finally {
     rmSync(tmpDir, { recursive: true, force: true })
 
