@@ -48,7 +48,8 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(["title","content","updatedAt"])
         && request.resource.data.updatedAt == request.time;
       allow delete: if isAuthenticated()
-        && request.auth.uid == resource.data.authorId;
+        && request.auth.uid == resource.data.authorId
+        || request.auth.token.admin == true;
 
       // ====[ posts / comments ]===================================================================
       match /posts/{commentId}/comments/{commentId} {

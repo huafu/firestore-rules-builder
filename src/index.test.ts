@@ -42,6 +42,7 @@ type Schema = {
 
 interface CustomClaims {
   admin?: boolean
+  date?: Date
 }
 
 const createBuilder = () => createFirestoreRulesBuilder<Schema, { authClaims: CustomClaims }>()
@@ -75,7 +76,12 @@ describe("createFirestoreRulesBuilder", () => {
               $.isServerTime("updatedAt"),
             ),
           ),
-          delete: $.if($.isOwner($.resource.data.authorId, true)),
+          delete: $.if(
+            $.or(
+              $.isOwner($.resource.data.authorId, true),
+              $.eq($.request.auth.token.admin, $.true),
+            ),
+          ),
         }))
         .sub((posts) => {
           posts.comments.rules(($) => ({
