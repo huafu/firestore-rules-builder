@@ -27,18 +27,26 @@ describe("context", () => {
     it("builds logical/comparison expressions", () => {
       const ctx = createRuleContextBase()
 
-      expect(RuleExpression.toString(ctx.and(ctx.raw("a"), ctx.raw("b")))).toMatch(
-        /^\s*a\s+&&\s+b\s*$/,
+      expect(RuleExpression.toString(ctx.and(ctx.raw("a"), ctx.raw("b")))).toMatchInlineSnapshot(
+        `"a && b"`,
       )
-      expect(RuleExpression.toString(ctx.andBlock(ctx.raw("a"), ctx.raw("b")))).toMatch(
-        /^\(\s*a\s+&&\s+b\s*\)$/,
+      expect(RuleExpression.toString(ctx.andBlock(ctx.raw("a"), ctx.raw("b"))))
+        .toMatchInlineSnapshot(`
+        "(
+          a
+          && b
+        )"
+      `)
+      expect(RuleExpression.toString(ctx.or(ctx.raw("a"), ctx.raw("b")))).toMatchInlineSnapshot(
+        `"a || b"`,
       )
-      expect(RuleExpression.toString(ctx.or(ctx.raw("a"), ctx.raw("b")))).toMatch(
-        /^\s*a\s+\|\|\s*b\s*$/,
-      )
-      expect(RuleExpression.toString(ctx.orBlock(ctx.raw("a"), ctx.raw("b")))).toMatch(
-        /^\(\s*a\s+\|\|\s+b\s*\)$/,
-      )
+      expect(RuleExpression.toString(ctx.orBlock(ctx.raw("a"), ctx.raw("b"))))
+        .toMatchInlineSnapshot(`
+        "(
+          a
+          || b
+        )"
+      `)
       expect(RuleExpression.toString(ctx.not(ctx.raw("request.auth")))).toBe("!(request.auth)")
       expect(RuleExpression.toString(ctx.eq(ctx.raw("a"), ctx.raw("b")))).toBe("a == b")
       expect(RuleExpression.toString(ctx.neq(ctx.raw("a"), ctx.raw("b")))).toBe("a != b")

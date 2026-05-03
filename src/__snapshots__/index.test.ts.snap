@@ -20,8 +20,7 @@ service cloud.firestore {
 
     // ====[ isAuthenticated ]======================================================================
     function isAuthenticated() {
-      return request.auth != null
-        && request.auth.uid != null;
+      return request.auth != null && request.auth.uid != null;
     }
 
     // ====[ hasClaim ]=============================================================================
@@ -34,8 +33,7 @@ service cloud.firestore {
     // ====[ users ]================================================================================
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow update: if isAuthenticated()
-        && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId;
       allow delete: if false;
     } // End of users
 
@@ -43,25 +41,35 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated()
-        && request.auth.uid == resource.data.authorId
+      allow update: if (
+        isAuthenticated() && request.auth.uid == resource.data.authorId
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(["title","content","updatedAt"])
-        && request.resource.data.updatedAt == request.time;
-      allow delete: if isAuthenticated()
-        && request.auth.uid == resource.data.authorId
-        || request.auth.token.admin == true;
+        && request.resource.data.updatedAt == request.time
+      );
+      allow delete: if (
+        isAuthenticated()
+        && (
+          request.auth.uid == resource.data.authorId
+          || request.auth.token.admin == true
+        )
+      );
 
       // ====[ posts / comments ]===================================================================
       match /posts/{commentId}/comments/{commentId} {
         allow read: if isAuthenticated();
         allow create: if isAuthenticated();
-        allow update: if isAuthenticated()
-          && request.auth.uid == resource.data.commenterId
+        allow update: if (
+          isAuthenticated() && request.auth.uid == resource.data.commenterId
           && request.resource.data.diff(resource.data).changedKeys().hasOnly(["text","updatedAt"])
-          && request.resource.data.updatedAt == request.time;
-        allow delete: if isAuthenticated()
-          && request.auth.uid == resource.data.commenterId
-          || hasClaim("admin", true);
+          && request.resource.data.updatedAt == request.time
+        );
+        allow delete: if (
+          isAuthenticated()
+          && (
+            isAuthenticated() && request.auth.uid == resource.data.commenterId
+            || hasClaim("admin", true)
+          )
+        );
       } // End of posts / comments
     } // End of posts
   } // End of rules
