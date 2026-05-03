@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/huafu/firestore-rules-dsl/compare/v0.2.0...v0.2.1) (2026-05-03)
+
+
+### Bug Fixes
+
+* :bug: accept typed authClaims metadata without index signature ([655cc63](https://github.com/huafu/firestore-rules-dsl/commit/655cc634edf44138bc90f463769dfd579289185d))
+* :bug: accept typed authClaims metadata without index signature ([719609b](https://github.com/huafu/firestore-rules-dsl/commit/719609b4a54d30b5ebfc257b60fa46b7952f0559))
+
 ## [0.2.0](https://github.com/huafu/firestore-rules-dsl/compare/v0.1.0...v0.2.0) (2026-05-03)
 
 
