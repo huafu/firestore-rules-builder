@@ -57,6 +57,22 @@ importers:
         specifier: ^4
         version: 4.1.5(@types/node@24.12.2)(@vitest/coverage-v8@4.1.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0))
 
+  .tmp/integration:
+    dependencies:
+      firestore-rules-dsl:
+        specifier: file:/Users/huafu/Work/libs/@huafu/firestore-rules-builder/firestore-rules-dsl-0.1.0.tgz
+        version: file:firestore-rules-dsl-0.1.0.tgz(typesaurus@10.7.0)
+    devDependencies:
+      typesaurus:
+        specifier: ^10.7.0
+        version: 10.7.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(@types/node@24.12.2)(@vitest/coverage-v8@4.1.5)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0))
+
 packages:
 
   '@babel/code-frame@7.29.0':
@@ -904,6 +920,16 @@ packages:
   find-up@5.0.0:
     resolution: {integrity: sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==}
     engines: {node: '>=10'}
+
+  firestore-rules-dsl@file:firestore-rules-dsl-0.1.0.tgz:
+    resolution: {integrity: sha512-CRawwOJbiJFeDbT5bhBzrTYA8X4Yi6WUDXvtdgsEP+VNjLyFuUWzd8IKj7UwM/MIQQP7mpO0wcUmw5p40Xh8Wg==, tarball: file:firestore-rules-dsl-0.1.0.tgz}
+    version: 0.1.0
+    engines: {node: '>=20'}
+    peerDependencies:
+      typesaurus: ^10
+    peerDependenciesMeta:
+      typesaurus:
+        optional: true
 
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
@@ -2348,6 +2374,10 @@ snapshots:
     dependencies:
       locate-path: 6.0.0
       path-exists: 4.0.0
+
+  firestore-rules-dsl@file:firestore-rules-dsl-0.1.0.tgz(typesaurus@10.7.0):
+    optionalDependencies:
+      typesaurus: 10.7.0
 
   flat-cache@4.0.1:
     dependencies:

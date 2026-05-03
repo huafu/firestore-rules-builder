@@ -2,6 +2,13 @@ import { execSync, type ExecSyncOptionsWithStringEncoding } from "node:child_pro
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 
+type PnpmPackResult = {
+  filename: string
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
 const repoRoot = process.cwd()
 const tmpDir = path.join(repoRoot, ".tmp")
 const integrationDir = path.join(tmpDir, "integration")
@@ -59,7 +66,14 @@ const copyIntegrationFixtures = () => {
 }
 
 const packTarball = () => {
-  const filename = runText("pnpm pack", { cwd: repoRoot, encoding: "utf8" })
+  const output = runText("pnpm pack --json", { cwd: repoRoot, encoding: "utf8" })
+  const parsed = JSON.parse(output) as unknown
+
+  if (!isRecord(parsed) || typeof parsed["filename"] !== "string") {
+    throw new Error("Unable to determine tarball filename from pnpm pack output")
+  }
+
+  const { filename } = parsed as PnpmPackResult
   return path.join(repoRoot, filename)
 }
 
