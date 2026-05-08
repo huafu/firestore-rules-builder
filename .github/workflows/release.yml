@@ -60,6 +60,14 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag_name }}
 
+      - name: Install dependencies for release
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Build library for release
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        run: pnpm run build
+
       - name: Publish package
         if: ${{ steps.release.outputs.release_created == 'true' }}
         run: pnpm publish --no-git-checks
