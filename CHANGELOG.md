@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.0...v0.4.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* 💚 empty release ([#11](https://github.com/huafu/firestore-rules-dsl/issues/11)) ([37a9c1a](https://github.com/huafu/firestore-rules-dsl/commit/37a9c1a9bb119037344926926e8ced8877c44c67))
+
 ## [0.4.0](https://github.com/huafu/firestore-rules-dsl/compare/v0.3.0...v0.4.0) (2026-05-08)
 
 
