@@ -29,14 +29,13 @@ const libFactory = <Db extends AnyDbSchema, Ns extends AnyDbNamespace, Lib>(
   $: RuleContextFor<Db, Ns, Lib>,
 ) => ({
   isAuthenticated: () => $.isset($.request.auth.uid),
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-  canAccess: <K extends DataKeysFor<Ns>>(key: K) =>
+  canAccess: (key: DataKeysFor<Ns>) =>
     $.and($.isset($.request.auth.uid), $.neq($.resource.data[key], $.null)),
   noClaim: (key: ClaimKeyFor<Db>) => $.eq($.request.auth.token.$prop(key), $.null),
 })
 
 describe("createTestUtils", () => {
-  it("injects helpers created by createFirestoreRulesLibrary into root context", () => {
+  it("injects helpers created with withHelpers into root context", () => {
     const test = createTestUtils<TestDb, Meta>().withHelpers(libFactory)
 
     const globalCtx = test.getContext()
