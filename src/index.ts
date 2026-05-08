@@ -1,4 +1,4 @@
-import { FirestoreRulesBuilder } from "./builder"
+import { FirestoreRulesBuilder, type FirestoreRootRulesBuilder } from "./builder"
 import { createRuleContextBase, createRuleContextDbHelpers } from "./context"
 import { HelpersRegistry } from "./helpers-registry"
 import type { DbMeta, DbSchema, FullDbSchema, ParentNamesFor } from "./types"
@@ -15,8 +15,11 @@ export type {
   RuleContextFor,
   AnyFullDbNamespace as AnyDbNamespace,
   AnyFullDbSchema as AnyDbSchema,
+  AnyRuleContext,
+  ClaimKeyFor,
   DataKeysFor,
   DbMeta,
+  LibFactory,
 } from "./types"
 export type { RuleExpression, RuleOperand } from "./expression"
 export type { RegisterHelper } from "./helpers-registry"
@@ -55,7 +58,7 @@ export { commonFirestoreRulesHelpers } from "./common-helpers"
 export function createFirestoreRulesBuilder<
   Schema extends DbSchema,
   Meta extends DbMeta = DbMeta,
->(): FirestoreRulesBuilder<FullDbSchema<Schema, Meta>, FullDbSchema<Schema, Meta>, never> {
+>(): FirestoreRootRulesBuilder<FullDbSchema<Schema, Meta>, FullDbSchema<Schema, Meta>> {
   type Db = FullDbSchema<Schema, Meta>
   const context = {
     ...createRuleContextDbHelpers<Db>(),

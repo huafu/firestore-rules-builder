@@ -331,7 +331,60 @@ These helpers are available in subsequent `rules(...)` callbacks and are emitted
 
 ## Custom Helpers
 
-Use `withHelpers(($, register) => ({ ... }))` to attach your own helper library.
+Define helper libraries as plain functions with the same signature used by
+`commonFirestoreRulesHelpers`:
+
+```ts
+import type {
+  AnyDbNamespace,
+  AnyDbSchema,
+  ClaimKeyFor,
+  DataKeysFor,
+  RegisterHelper,
+  RuleContextFor,
+} from "firestore-rules-dsl"
+
+export const blogRulesHelpers = <Db extends AnyDbSchema, Ns extends AnyDbNamespace, Lib>(
+  context: RuleContextFor<Db, Ns, Lib>,
+  register: RegisterHelper,
+) => {
+  const isSignedIn = register("isSignedIn", [], () =>
+    context.return(context.isset(context.request.auth.uid)),
+  )
+
+  const canEditPost = register("canEditPost", ["authorId"] as const, ({ authorId }) =>
+    context.return(context.eq(context.request.auth.uid, authorId)),
+  )
+
+  // DataKeysFor<Ns> keeps the key aligned with the current collection data shape.
+  const isServerTimestamp = (field: DataKeysFor<Ns>) =>
+    context.eq(context.request.resource.data[field], context.request.time)
+
+  // ClaimKeyFor<Db> keeps claim keys aligned with Meta["authClaims"].
+  const noClaim = (claim: ClaimKeyFor<Db>) =>
+    context.eq(context.request.auth.token.$prop(claim), context.null)
+
+  return {
+    isSignedIn,
+    canEditPost,
+    isServerTimestamp,
+    noClaim,
+  }
+}
+```
+
+For helper libraries, these two type helpers are especially useful:
+
+- `DataKeysFor<Ns>` for collection data field keys (for example, `"ownerId"`, `"createdAt"`).
+- `ClaimKeyFor<Db>` for auth claim keys based on your builder metadata.
+
+Then pass the library to `withHelpers(...)`:
+
+```ts
+const builder = createFirestoreRulesBuilder<Schema>().withHelpers(blogRulesHelpers)
+```
+
+You can also define helpers inline when reuse is not needed:
 
 ```ts
 const builder = createFirestoreRulesBuilder<Schema>().withHelpers(($, register) => ({
@@ -397,6 +450,7 @@ Main exports (`firestore-rules-dsl`):
 - `RegisterHelper`
 - `DbMeta`
 - `DataKeysFor`
+- `ClaimKeyFor`
 - `AnyDbNamespace`
 - `AnyDbSchema`
 - `RuleError`
