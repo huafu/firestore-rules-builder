@@ -67,17 +67,6 @@ type TestUtils<
   withRoot: () => TestUtils<Db, Db, never, Lib>
 
   /**
-   * Moves scope to the namespace under a child collection key.
-   *
-   * @typeParam Key - Child collection key in the current namespace.
-   * @param ns - Child collection key to traverse into.
-   * @returns TestUtils at the child collection namespace scope.
-   */
-  withNamespace: <Key extends keyof Ns["collections"] & string>(
-    ns: Key,
-  ) => TestUtils<Db, Ns["collections"][Key]["namespace"], never, Lib>
-
-  /**
    * Moves scope to a concrete child collection under the current namespace.
    *
    * @typeParam Key - Child collection key in the current namespace.
@@ -86,7 +75,7 @@ type TestUtils<
    */
   withCollection: <Key extends keyof Ns["collections"] & string>(
     collection: Key,
-  ) => TestUtils<Db, Ns, Ns["collections"][Key], Lib>
+  ) => TestUtils<Db, Ns["collections"][Key]["namespace"], Ns["collections"][Key], Lib>
 
   /**
    * Returns the typed rule context for the active test scope.
@@ -95,7 +84,7 @@ type TestUtils<
    *
    * @returns Context value typed for the current builder position and helpers.
    */
-  getContext: () => RuleContextFor<Db, [Col] extends [never] ? Ns : Col, Lib>
+  getContext: () => RuleContextFor<Db, Ns, Lib>
 }
 
 /**
@@ -133,25 +122,11 @@ const testUtils = ({
     },
     withDb: () => testUtils({ factories }),
     withRoot: () => testUtils({ factories }),
-    withNamespace: (ns: string) =>
-      testUtils({
-        factories,
-        builder: builder.collection(ns) as FirestoreRulesBuilder<
-          AnyFullDbSchema,
-          AnyFullDbSchema,
-          never,
-          any
-        >,
-      }),
     withCollection: (collection: string) =>
       testUtils({
         factories,
-        builder: builder.collection(collection) as FirestoreRulesBuilder<
-          AnyFullDbSchema,
-          AnyFullDbSchema,
-          never,
-          any
-        >,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        builder: builder.collection(collection) as any,
       }),
     getContext: () => builder.context,
   }

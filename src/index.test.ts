@@ -1,7 +1,6 @@
 import {
   commonFirestoreRulesHelpers,
   createFirestoreRulesBuilder,
-  createFirestoreRulesLibrary,
   type DbCollection,
 } from "./index"
 import { describe, it, expect, beforeEach } from "vitest"
@@ -100,19 +99,5 @@ describe("createFirestoreRulesBuilder", () => {
         })
     })
     expect(builder.toString()).toMatchSnapshot()
-  })
-})
-
-describe("createFirestoreRulesLibrary", () => {
-  it("should create a library with the provided helpers", () => {
-    const libFactory = createFirestoreRulesLibrary(($) => {
-      return {
-        isAdmin: () => $.isset($.request.auth.token.$prop("admin")),
-      }
-    })
-
-    const builderWIthLib = builder.withHelpers(libFactory)
-
-    expect(builderWIthLib.context).toHaveProperty("isAdmin", expect.any(Function))
   })
 })

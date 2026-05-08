@@ -1,5 +1,13 @@
-import type { RuleExpression, RuleOperand } from "./index"
-import { createFirestoreRulesLibrary } from "./index"
+import type {
+  RuleExpression,
+  RuleOperand,
+  AnyDbSchema,
+  AnyDbNamespace,
+  RuleContextFor,
+  RegisterHelper,
+  ClaimKeyFor,
+  DataKeysFor,
+} from "./index"
 
 /**
  * Registers the bundled auth helpers on the current builder context.
@@ -18,7 +26,10 @@ import { createFirestoreRulesLibrary } from "./index"
  *   .withHelpers(commonFirestoreRulesHelpers)
  * ```
  */
-export const commonFirestoreRulesHelpers = createFirestoreRulesLibrary((context, register) => {
+export const commonFirestoreRulesHelpers = <Db extends AnyDbSchema, Ns extends AnyDbNamespace, Lib>(
+  context: RuleContextFor<Db, Ns, Lib>,
+  register: RegisterHelper,
+) => {
   const isAuthenticated = register("isAuthenticated", [], () =>
     context.return(
       context.and(context.isset(context.request.auth), context.isset(context.request.auth.uid)),
@@ -27,17 +38,14 @@ export const commonFirestoreRulesHelpers = createFirestoreRulesLibrary((context,
 
   const hasClaim = register("hasClaim", ["claim", "expected"], (arg) =>
     context.return(context.eq(context.request.auth.token.$prop(arg.claim), arg.expected)),
-  ) as (
-    claim: typeof context.$TAuthClaimKey | RuleExpression,
-    expected: RuleOperand,
-  ) => RuleExpression
+  ) as (claim: ClaimKeyFor<Db> | RuleExpression, expected: RuleOperand) => RuleExpression
 
   const isOwner = (uid: RuleOperand, checkAuth = false) =>
     checkAuth
       ? context.and(isAuthenticated(), context.eq(context.request.auth.uid, uid))
       : context.eq(context.request.auth.uid, uid)
 
-  const isServerTime = (ts: RuleExpression | typeof context.$TDataKey) =>
+  const isServerTime = (ts: RuleExpression | DataKeysFor<Ns>) =>
     context.eq(
       typeof ts === "string" ? context.request.resource.data[ts] : ts,
       context.request.time,
@@ -103,4 +111,4 @@ export const commonFirestoreRulesHelpers = createFirestoreRulesLibrary((context,
      */
     isServerTime,
   }
-})
+}

@@ -457,22 +457,11 @@ export interface RuleContextBase {
   join(separator: string, parts: readonly RuleOperand[], nl?: boolean): RuleExpression<"join">
 }
 
-type ClaimKeyFor<Db extends AnyFullDbSchema, Default extends string = never> = [
+export type ClaimKeyFor<Db extends AnyFullDbSchema, Default extends string = never> = [
   keyof Db["meta"]["authClaims"] & string,
 ] extends [never]
   ? Default
   : keyof Db["meta"]["authClaims"] & string
-
-type RuleContextTypesFor<
-  Db extends AnyFullDbSchema,
-  Ns extends AnyFullDbNamespace | AnyFullDbCollectionBase,
-> = {
-  readonly $TDb: Db
-  readonly $TNamespace: Ns extends AnyFullDbNamespace ? Ns : never
-  readonly $TCollection: CollectionFor<Ns>
-  readonly $TAuthClaimKey: ClaimKeyFor<Db>
-  readonly $TDataKey: DataKeysFor<Ns>
-}
 
 export type RuleContextFor<
   Db extends AnyFullDbSchema,
@@ -483,7 +472,6 @@ export type RuleContextFor<
     RuleContextProxies<Db, Ns> &
     RuleContextDbHelpers<Db> &
     RuleContextDataHelpers<Db, Ns> &
-    RuleContextTypesFor<Db, Ns> &
     Lib
 >
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
