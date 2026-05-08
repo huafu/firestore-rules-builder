@@ -9,52 +9,52 @@ importers:
   .:
     devDependencies:
       '@commitlint/cli':
-        specifier: ^20.5.3
+        specifier: ^20
         version: 20.5.3(@types/node@24.12.3)(conventional-commits-parser@6.4.0)(typescript@6.0.3)
       '@commitlint/config-conventional':
-        specifier: ^20.5.3
+        specifier: ^20
         version: 20.5.3
       '@eslint/js':
-        specifier: ^10.0.1
+        specifier: ^10
         version: 10.0.1(eslint@10.3.0(jiti@2.7.0))
       '@types/node':
-        specifier: ^24.12.3
+        specifier: ^24
         version: 24.12.3
       '@vitest/coverage-v8':
-        specifier: ^4.1.5
+        specifier: ^4
         version: 4.1.5(vitest@4.1.5)
       eslint:
-        specifier: ^10.3.0
+        specifier: ^10
         version: 10.3.0(jiti@2.7.0)
       globals:
-        specifier: ^17.6.0
+        specifier: ^17
         version: 17.6.0
       jiti:
-        specifier: ^2.7.0
+        specifier: ^2
         version: 2.7.0
       prettier:
-        specifier: ^3.8.3
+        specifier: ^3
         version: 3.8.3
       tsx:
-        specifier: ^4.21.0
+        specifier: ^4
         version: 4.21.0
       typesaurus:
-        specifier: ^10.7.0
+        specifier: ^10
         version: 10.7.0
       typescript:
-        specifier: ^6.0.3
+        specifier: ^6
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.59.2
+        specifier: ^8
         version: 8.59.2(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3)
       vite:
-        specifier: ^8.0.11
+        specifier: ^8
         version: 8.0.11(@types/node@24.12.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)
       vite-plugin-dts:
-        specifier: ^5.0.0
+        specifier: ^5
         version: 5.0.0(esbuild@0.27.7)(typescript@6.0.3)(vite@8.0.11(@types/node@24.12.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0))
       vitest:
-        specifier: ^4.1.5
+        specifier: ^4
         version: 4.1.5(@types/node@24.12.3)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@24.12.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0))
 
 packages:
