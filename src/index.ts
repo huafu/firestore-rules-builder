@@ -1,7 +1,15 @@
-import { FirestoreRulesBuilder } from "./builder"
+import { FirestoreRulesBuilder, type FirestoreRootRulesBuilder } from "./builder"
 import { createRuleContextBase, createRuleContextDbHelpers } from "./context"
 import { HelpersRegistry } from "./helpers-registry"
-import type { DbMeta, DbSchema, FullDbSchema, ParentNamesFor } from "./types"
+import type {
+  AnyFullDbNamespace,
+  AnyFullDbSchema,
+  DbMeta,
+  DbSchema,
+  FullDbSchema,
+  LibFactory,
+  ParentNamesFor,
+} from "./types"
 
 /**
  * Public schema and context types used to describe a Firestore rules model.
@@ -15,6 +23,7 @@ export type {
   RuleContextFor,
   AnyFullDbNamespace as AnyDbNamespace,
   AnyFullDbSchema as AnyDbSchema,
+  AnyRuleContext,
   DataKeysFor,
   DbMeta,
 } from "./types"
@@ -55,7 +64,7 @@ export { commonFirestoreRulesHelpers } from "./common-helpers"
 export function createFirestoreRulesBuilder<
   Schema extends DbSchema,
   Meta extends DbMeta = DbMeta,
->(): FirestoreRulesBuilder<FullDbSchema<Schema, Meta>, FullDbSchema<Schema, Meta>, never> {
+>(): FirestoreRootRulesBuilder<FullDbSchema<Schema, Meta>, FullDbSchema<Schema, Meta>> {
   type Db = FullDbSchema<Schema, Meta>
   const context = {
     ...createRuleContextDbHelpers<Db>(),
@@ -63,4 +72,34 @@ export function createFirestoreRulesBuilder<
   }
   const registry = new HelpersRegistry()
   return new FirestoreRulesBuilder<Db, Db, never>(registry, [] as ParentNamesFor<Db>, context, {})
+}
+
+/**
+ * Utility to define a reusable helper library that can be registered on a builder
+ * context with `withHelpers(...)`.
+ * This is a convenience function that preserves type inference for the provided factory, and
+ * can be used to create shared libraries of helper functions across projects.
+ * @param factory - A function that takes a builder context and helper registrar,
+ * and returns an object of helper functions to be merged into the builder's
+ * library.
+ * @returns The provided factory, unmodified.
+ */
+export function createFirestoreRulesLibrary<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Factory extends LibFactory<any, AnyFullDbSchema, AnyFullDbNamespace, any>,
+>(
+  factory: Factory,
+): Factory &
+  (<Db extends AnyFullDbSchema, Ns extends AnyFullDbNamespace, PrevLib>(
+    ...args: Parameters<LibFactory<ReturnType<Factory>, Db, Ns, PrevLib>>
+  ) => ReturnType<Factory>)
+
+export function createFirestoreRulesLibrary<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Factory extends LibFactory<any, AnyFullDbSchema, AnyFullDbNamespace, any>,
+>(factory: Factory) {
+  return factory as Factory &
+    (<Db extends AnyFullDbSchema, Ns extends AnyFullDbNamespace, PrevLib>(
+      ...args: Parameters<LibFactory<ReturnType<Factory>, Db, Ns, PrevLib>>
+    ) => ReturnType<Factory>)
 }

@@ -26,12 +26,18 @@ import {
   type RuleMap,
 } from "./types"
 
+export type FirestoreRootRulesBuilder<
+  Db extends AnyFullDbSchema,
+  Ns extends AnyFullDbNamespace,
+  Lib = {},
+> = Omit<FirestoreRulesBuilder<Db, Ns, never, Lib>, "context" | "lib">
+
 export type FirestoreChildRulesBuilder<
   Db extends AnyFullDbSchema,
   Ns extends AnyFullDbNamespace,
   Col extends AnyFullDbCollection,
   Lib = {},
-> = Omit<FirestoreRulesBuilder<Db, Ns, Col, Lib>, "toString">
+> = Omit<FirestoreRulesBuilder<Db, Ns, Col, Lib>, "toString" | "context" | "lib">
 
 type BuilderFor<
   Db extends AnyFullDbSchema,
@@ -124,7 +130,7 @@ export class FirestoreRulesBuilder<
     >
   }>
 
-  protected get context(): RuleContextFor<Db, Ns, Lib> {
+  get context(): RuleContextFor<Db, Ns, Lib> {
     return {
       ...this._context.base,
       ...this._context.data,
@@ -133,7 +139,7 @@ export class FirestoreRulesBuilder<
     } as RuleContextFor<Db, Ns, Lib>
   }
 
-  protected get lib(): Lib {
+  get lib(): Lib {
     return {
       ...this._lib._original,
       ...this._lib._extra,
@@ -218,7 +224,7 @@ export class FirestoreRulesBuilder<
   public rules(builder: RuleBuilderForCollection<Db, Col, Lib>): BuilderFor<Db, Ns, Col, Lib> {
     const err = ruleError()
     this._ruleFactories.push((prev: RuleMap) => {
-      const rules = builder(this.context as RuleContextFor<Db, Col, Lib>)
+      const rules = builder(this.context as unknown as RuleContextFor<Db, Col, Lib>)
 
       // check for duplicate rule definitions
       for (const method in rules) {

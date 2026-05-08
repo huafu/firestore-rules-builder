@@ -251,10 +251,13 @@ export type CollectionFor<Ns extends AnyFullDbNamespace | AnyFullDbCollectionBas
 /**
  * Valid document data keys for the current collection scope.
  */
-export type DataKeysFor<Ns extends AnyFullDbNamespace | AnyFullDbCollectionBase> =
+export type DataKeysFor<
+  Ns extends AnyFullDbNamespace | AnyFullDbCollectionBase,
+  Default extends string = never,
+> =
   CollectionFor<Ns> extends AnyFullDbCollectionBase
     ? keyof CollectionFor<Ns>["data"] & string
-    : never
+    : Default
 
 /**
  * Typed `request` proxy for the current scope.
@@ -454,6 +457,23 @@ export interface RuleContextBase {
   join(separator: string, parts: readonly RuleOperand[], nl?: boolean): RuleExpression<"join">
 }
 
+type ClaimKeyFor<Db extends AnyFullDbSchema, Default extends string = never> = [
+  keyof Db["meta"]["authClaims"] & string,
+] extends [never]
+  ? Default
+  : keyof Db["meta"]["authClaims"] & string
+
+type RuleContextTypesFor<
+  Db extends AnyFullDbSchema,
+  Ns extends AnyFullDbNamespace | AnyFullDbCollectionBase,
+> = {
+  readonly $TDb: Db
+  readonly $TNamespace: Ns extends AnyFullDbNamespace ? Ns : never
+  readonly $TCollection: CollectionFor<Ns>
+  readonly $TAuthClaimKey: ClaimKeyFor<Db>
+  readonly $TDataKey: DataKeysFor<Ns>
+}
+
 export type RuleContextFor<
   Db extends AnyFullDbSchema,
   Ns extends AnyFullDbNamespace | AnyFullDbCollectionBase,
@@ -463,8 +483,11 @@ export type RuleContextFor<
     RuleContextProxies<Db, Ns> &
     RuleContextDbHelpers<Db> &
     RuleContextDataHelpers<Db, Ns> &
+    RuleContextTypesFor<Db, Ns> &
     Lib
 >
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
+export type AnyRuleContext = RuleContextFor<AnyFullDbSchema, AnyFullDbNamespace, {}>
 
 /**
  * Complete rule context type available inside `rules(...)` callbacks.
@@ -480,22 +503,10 @@ export type RuleContextFor<
  * The factory receives the fully typed rule context for the current builder and
  * a registrar that can promote selected helpers into named Firestore functions.
  */
-export type LibFactory<
-  NewLib,
-  Db extends AnyFullDbSchema = EmptySchema,
-  Ns extends AnyFullDbNamespace = Db,
-  Lib = {},
-> = (context: RuleContextFor<Db, Ns, Lib>, register: RegisterHelper) => NewLib
-
-/**
- * Generic helper-factory form for reusable helper libraries.
- */
-export interface GenericLibFactory<Lib> {
-  <Db extends AnyFullDbSchema, Ns extends AnyFullDbNamespace, CurrentLib>(
-    context: RuleContextFor<Db, Ns, CurrentLib>,
-    register: RegisterHelper,
-  ): Lib
-}
+export type LibFactory<NewLib, Db extends AnyFullDbSchema, Ns extends AnyFullDbNamespace, Lib> = (
+  context: RuleContextFor<Db, Ns, Lib>,
+  register: RegisterHelper,
+) => NewLib
 
 /**
  * Rule callback signature for a concrete collection builder.
