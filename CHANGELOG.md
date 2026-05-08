@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/huafu/firestore-rules-dsl/compare/v0.3.0...v0.4.0) (2026-05-08)
+
+
+### Features
+
+* ✨ add typed helper libraries and testing utilities ([#9](https://github.com/huafu/firestore-rules-dsl/issues/9)) ([edf8feb](https://github.com/huafu/firestore-rules-dsl/commit/edf8febb86de46bc5f7a439ab1bf69edaa54abd5))
+
 ## [0.3.0](https://github.com/huafu/firestore-rules-dsl/compare/v0.2.1...v0.3.0) (2026-05-03)
 
 
