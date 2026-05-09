@@ -4,10 +4,12 @@ import dts from "vite-plugin-dts"
 export default defineConfig({
   build: {
     lib: {
-      entry: "src/index.ts",
-      name: "createFirestoreRulesBuilder",
+      entry: {
+        index: "src/index.ts",
+        testing: "src/testing.ts",
+      },
       formats: ["es", "cjs"],
-      fileName: (format) => (format === "es" ? "index.js" : "index.cjs"),
+      fileName: (format, entryName) => (format === "es" ? `${entryName}.js` : `${entryName}.cjs`),
     },
   },
   plugins: [
