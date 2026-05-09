@@ -158,7 +158,9 @@ export class HelpersRegistry {
         }
         return operand(argValue)
       })
-      const call = expr(`call:${name}`)(() => `${name}(${argList.join(", ")})`)
+      const call = expr(`call:${name}`)(
+        (opt) => `${name}(${argList.map((arg) => RuleExpression.toString(arg, opt)).join(", ")})`,
+      )
       // Mark this helper as used after generating the call expression so that dependencies are registered before
       this.usedHelpers.add(name)
       this.isResolved = false
