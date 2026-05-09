@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.1...v0.4.2) (2026-05-09)
+
+
+### Bug Fixes
+
+* :green_heart: testing submodule not exported ([#13](https://github.com/huafu/firestore-rules-dsl/issues/13)) ([2e77f1b](https://github.com/huafu/firestore-rules-dsl/commit/2e77f1b76d85fc3ae2b822fd8c8d31beb3a39ccf))
+
 ## [0.4.1](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.0...v0.4.1) (2026-05-08)
 
 
