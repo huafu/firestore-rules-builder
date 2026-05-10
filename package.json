@@ -1,6 +1,6 @@
 {
   "name": "firestore-rules-dsl",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Strongly typed DSL to generate Firebase Firestore Security Rules",
   "type": "module",
   "author": {
