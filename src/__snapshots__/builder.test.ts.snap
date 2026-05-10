@@ -23,7 +23,7 @@ service cloud.firestore {
       allow read: if true;
 
       // ====[ users / posts ]======================================================================
-      match /users/{postId}/posts/{postId} {
+      match /posts/{postId} {
         allow create: if true;
       } // End of users / posts
     } // End of users

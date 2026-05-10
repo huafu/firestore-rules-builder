@@ -55,7 +55,7 @@ service cloud.firestore {
       );
 
       // ====[ posts / comments ]===================================================================
-      match /posts/{commentId}/comments/{commentId} {
+      match /comments/{commentId} {
         allow read: if isAuthenticated();
         allow create: if isAuthenticated();
         allow update: if (
