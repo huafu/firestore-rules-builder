@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { RuleExpression, expr } from "./expression"
 import { HelpersRegistry } from "./helpers-registry"
+import { createPathProxy } from "./proxy"
 
 const raw = expr()
 
@@ -15,6 +16,19 @@ describe("helpers-registry", () => {
     )
 
     expect(RuleExpression.toString(isOwner("alice"))).toBe('isOwner("alice")')
+  })
+
+  it("renders helper calls correctly when used with a PathProxy as argument", () => {
+    const registry = new HelpersRegistry()
+    const isOwner = registry.register(
+      "isOwner",
+      ["userId"] as const,
+      ({ userId }) => raw`request.auth.uid == ${userId}`,
+    )
+
+    const pp = createPathProxy<{ test: string }>("req")
+
+    expect(RuleExpression.toString(isOwner(pp.test))).toBe("isOwner(req.test)")
   })
 
   it("throws on duplicate helper names", () => {
