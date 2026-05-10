@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.3](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.2...v0.4.3) (2026-05-10)
+
+
+### Bug Fixes
+
+* :bug: use relative path instead of absolute ones in match sections ([#17](https://github.com/huafu/firestore-rules-dsl/issues/17)) ([2ef229c](https://github.com/huafu/firestore-rules-dsl/commit/2ef229c33e881a0b7bc5e89216c32b0814feeeff)), closes [#16](https://github.com/huafu/firestore-rules-dsl/issues/16)
+* 🐛 error when calling a registered helper with a path proxy as argument ([#15](https://github.com/huafu/firestore-rules-dsl/issues/15)) ([6bde646](https://github.com/huafu/firestore-rules-dsl/commit/6bde64689655f412a52bbefb2de050b4446a567a))
+
 ## [0.4.2](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.1...v0.4.2) (2026-05-09)
 
 
