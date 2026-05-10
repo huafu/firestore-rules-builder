@@ -280,6 +280,11 @@ export class FirestoreRulesBuilder<
     )
   }
 
+  protected get relativePath(): string {
+    if (this.isRoot) return "/databases/{database}/documents"
+    return `/${this._path[this._path.length - 1] as unknown as string}/{${this.paramName}}`
+  }
+
   protected get prettyPath(): string {
     return this._path.join(" / ")
   }
@@ -369,7 +374,7 @@ export class FirestoreRulesBuilder<
         indentationLevel: level + 1,
       })
       return [
-        `${baseIndent}match /databases/{database}/documents {`,
+        `${baseIndent}match ${this.relativePath} {`,
         helperLines.length > 0
           ? comments
             ? [`${indent}// ****[ HELPERS ]`.padEnd(LineLength, "*"), ""]
@@ -388,7 +393,7 @@ export class FirestoreRulesBuilder<
       // nested level
       return [
         comments ? [`${baseIndent}// ====[ ${this.prettyPath} ]`.padEnd(LineLength, "=")] : [],
-        `${baseIndent}match ${this.path} {`,
+        `${baseIndent}match ${this.relativePath} {`,
         ...body,
         `${baseIndent}}${comments ? ` // End of ${this.prettyPath}` : ""}`,
       ].flat()
