@@ -55,6 +55,14 @@ export type OfTypesaurus<
 /** Internal empty-helper baseline used as the starting Lib generic. */
 type EmptyLib = Record<never, never>
 
+function isRulesBuilderOptions(value: unknown): value is RulesBuilderOptions {
+  if (value === undefined || value === null || typeof value !== "object") return false
+  if (Array.isArray(value)) return false
+
+  const candidate = value as Record<string, unknown>
+  return "version" in candidate || "print" in candidate || Object.keys(candidate).length === 0
+}
+
 /**
  * Creates an AST-native rules builder directly from a Typesaurus db or schema value.
  *
@@ -64,8 +72,10 @@ type EmptyLib = Record<never, never>
  *
  * @typeParam T - Typesaurus db instance or schema type.
  * @typeParam TCustomClaims - Optional `request.auth.token` claims shape.
- * @param _db - Typesaurus db/schema value used for type inference only.
- * @param options - Optional builder rendering options.
+ * @param _db - Optional Typesaurus db/schema value used for type inference only.
+ * When omitted, provide `T` explicitly via a generic type argument.
+ * @param options - Optional builder rendering options. Can be passed as the
+ * first argument when `_db` is omitted.
  * @returns Root AST-native rules builder typed from the Typesaurus model.
  *
  * @example
@@ -80,6 +90,8 @@ type EmptyLib = Record<never, never>
  *     users.allow("read", $.request.auth.uid.neq(null))
  *   })
  * })
+ *
+ * const typedBuilder = createTypesaurusRulesBuilder<typeof db>({ version: "2" })
  * ```
  */
 export function createTypesaurusRulesBuilder<
@@ -87,12 +99,42 @@ export function createTypesaurusRulesBuilder<
   TCustomClaims extends CustomClaimsShape = EmptyClaims,
 >(
   _db: T,
-  options: RulesBuilderOptions = {},
+  options?: RulesBuilderOptions,
+): FirestoreAstRulesBuilder<
+  TypesaurusDatabaseDefinition<T, TCustomClaims>,
+  TypesaurusCollections<T>,
+  "",
+  EmptyLib
+>
+export function createTypesaurusRulesBuilder<
+  T extends AnyTypesaurusSchema | AnyTypesaurusDB,
+  TCustomClaims extends CustomClaimsShape = EmptyClaims,
+>(
+  options?: RulesBuilderOptions,
+): FirestoreAstRulesBuilder<
+  TypesaurusDatabaseDefinition<T, TCustomClaims>,
+  TypesaurusCollections<T>,
+  "",
+  EmptyLib
+>
+export function createTypesaurusRulesBuilder<
+  T extends AnyTypesaurusSchema | AnyTypesaurusDB,
+  TCustomClaims extends CustomClaimsShape = EmptyClaims,
+>(
+  _dbOrOptions?: T | RulesBuilderOptions,
+  options?: RulesBuilderOptions,
 ): FirestoreAstRulesBuilder<
   TypesaurusDatabaseDefinition<T, TCustomClaims>,
   TypesaurusCollections<T>,
   "",
   EmptyLib
 > {
-  return createAstRulesBuilder<TypesaurusDatabaseDefinition<T, TCustomClaims>>(options)
+  const resolvedOptions =
+    arguments.length >= 2
+      ? (options ?? {})
+      : isRulesBuilderOptions(_dbOrOptions)
+        ? _dbOrOptions
+        : {}
+
+  return createAstRulesBuilder<TypesaurusDatabaseDefinition<T, TCustomClaims>>(resolvedOptions)
 }

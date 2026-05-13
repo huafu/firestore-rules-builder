@@ -141,6 +141,34 @@ describe("Typesaurus builder adapter", () => {
     expectTypeOf<Result>().toEqualTypeOf<true>()
   })
 
+  it("allows generic-only usage without passing a db value", () => {
+    const builder = createTypesaurusRulesBuilder<Db>()
+    type Result =
+      typeof builder extends import("../builder/rules-builder").FirestoreAstRulesBuilder<
+        OfTypesaurus<Db>,
+        ExpectedCollections,
+        "",
+        Record<never, never>
+      >
+        ? true
+        : false
+    expectTypeOf<Result>().toEqualTypeOf<true>()
+  })
+
+  it("accepts options as first argument when using generic-only usage", () => {
+    const builder = createTypesaurusRulesBuilder<Db>({ version: "2" })
+    type Result =
+      typeof builder extends import("../builder/rules-builder").FirestoreAstRulesBuilder<
+        OfTypesaurus<Db>,
+        ExpectedCollections,
+        "",
+        Record<never, never>
+      >
+        ? true
+        : false
+    expectTypeOf<Result>().toEqualTypeOf<true>()
+  })
+
   it("supports withCustomClaims to narrow auth token type", () => {
     const builder = createAstRulesBuilder<OfTypesaurus<Db>>().withCustomClaims<{
       admin: boolean
