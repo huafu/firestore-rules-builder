@@ -5,5 +5,5 @@
     "source.fixAll.eslint": "explicit"
   },
   "prettier.requireConfig": true,
-  "cSpell.words": ["Typesaurus"]
+  "cSpell.words": ["subcollection", "subcollections", "Typesaurus"]
 }
