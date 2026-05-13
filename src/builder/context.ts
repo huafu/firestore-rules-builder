@@ -56,9 +56,7 @@ import {
   getAfter,
   callHelper,
 } from "../ast/known-factories"
-
-/** Internal empty-object utility for generic defaults. */
-type EmptyObject = Record<never, never>
+import type { EmptyObject } from "./utils"
 
 /** Extracts route params from a path pattern like `users/{userId}/posts/{postId}`. */
 type PathParams<TPath extends string> = TPath extends `${infer Head}/${infer Tail}`

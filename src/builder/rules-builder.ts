@@ -33,9 +33,7 @@ import {
   type DeepMergeHelperLibraries,
   type RegisterContextHelper,
 } from "./helpers"
-
-/** Internal empty-object utility for generic defaults. */
-type EmptyObject = Record<never, never>
+import type { EmptyObject } from "./utils"
 /** Internal collection map constraint used by builder generics. */
 type CollectionMap = Record<string, CollectionShape<any, any>>
 

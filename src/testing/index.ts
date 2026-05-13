@@ -19,18 +19,14 @@ import {
 import type { CollectionShape, DatabaseDefinition } from "../builder/db"
 import type { DeepMergeHelperLibraries, HelperLibrary } from "../builder/helpers"
 import type { FirestoreRulesLibrary } from "../library/index"
-
-/** Testing utility module for inspecting generated Firestore rules AST/source. */
-
-/** Internal empty helper-library baseline before calling withHelpers. */
-type EmptyObject = Record<never, never>
+import type { EmptyObject } from "../builder/utils"
 
 /** Internal constraint for supported root database collection maps. */
 type CollectionMap = Record<string, CollectionShape<Record<string, unknown>, unknown>>
 
 /** Internal root builder alias used by harness entrypoints. */
 type RootBuilder<Db extends DatabaseDefinition<CollectionMap, Record<string, unknown>>> =
-  FirestoreAstRulesBuilder<Db, Db["collections"], "", EmptyObject>
+  FirestoreAstRulesBuilder<Db, Db["collections"]>
 
 /**
  * Internal root builder alias with merged helper-library typings.

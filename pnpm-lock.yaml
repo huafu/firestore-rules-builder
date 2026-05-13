@@ -60,8 +60,8 @@ importers:
   .tmp/integration:
     dependencies:
       firestore-rules-dsl:
-        specifier: file:/Users/huafu/Work/libs/@huafu/firestore-rules-builder/firestore-rules-dsl-0.4.2.tgz
-        version: file:firestore-rules-dsl-0.4.2.tgz(typesaurus@10.7.0)
+        specifier: file:/Users/huafu/Work/libs/@huafu/firestore-rules-builder/firestore-rules-dsl-0.4.3.tgz
+        version: file:firestore-rules-dsl-0.4.3.tgz(typesaurus@10.7.0)
     devDependencies:
       typesaurus:
         specifier: ^10.7.0
@@ -921,9 +921,9 @@ packages:
     resolution: {integrity: sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==}
     engines: {node: '>=10'}
 
-  firestore-rules-dsl@file:firestore-rules-dsl-0.4.2.tgz:
-    resolution: {integrity: sha512-fRntw9rvojxDZPAbVRR/JYAnA2vmdEcLWxIo+Mm3a5Pz+Lvy+DjrcMD08M2jGlx2pXu3cE5iLhBHhjt8YhNWDA==, tarball: file:firestore-rules-dsl-0.4.2.tgz}
-    version: 0.4.2
+  firestore-rules-dsl@file:firestore-rules-dsl-0.4.3.tgz:
+    resolution: {integrity: sha512-iEABOHpi6f6sbM0HhjZvBnBcKO/rnglzLtmLXtsWHxCzUL42S6uC052gUNx4W/umPc8H6p+Q8TuHMk8Pfo6HzQ==, tarball: file:firestore-rules-dsl-0.4.3.tgz}
+    version: 0.4.3
     engines: {node: '>=20'}
     peerDependencies:
       typesaurus: ^10
@@ -2387,7 +2387,7 @@ snapshots:
       locate-path: 6.0.0
       path-exists: 4.0.0
 
-  firestore-rules-dsl@file:firestore-rules-dsl-0.4.2.tgz(typesaurus@10.7.0):
+  firestore-rules-dsl@file:firestore-rules-dsl-0.4.3.tgz(typesaurus@10.7.0):
     optionalDependencies:
       typesaurus: 10.7.0
 

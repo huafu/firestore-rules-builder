@@ -19,9 +19,7 @@ import {
   type RuleValue,
 } from "./context"
 import type { DatabaseDefinition } from "./db"
-
-/** Internal empty-object utility for generic defaults. */
-type EmptyObject = Record<never, never>
+import type { EmptyObject } from "./utils"
 
 /**
  * Signature for callable helper functions available on rule contexts.
