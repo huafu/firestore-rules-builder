@@ -19,6 +19,7 @@ import {
   stringLiteral,
 } from "../ast/factories"
 import {
+  requestAuth,
   requestAuthTokenClaim,
   resourceId,
   resourceData,
@@ -78,6 +79,7 @@ export type PublicExpression = Omit<ExpressionNode, "kind" | "loc">
 
 /** Internal alias used for concise proxy method signatures. */
 type Expr = PublicExpression
+type RuleValueInput = Expr | string | number | boolean | null
 
 /** Common comparison/type-check methods available on all proxied values. */
 type CommonValueMethods = {
@@ -98,7 +100,7 @@ type CommonValueMethods = {
    * $.resource.data.status.eq("active")
    * ```
    */
-  eq(value: Expr): Expr
+  eq(value: RuleValueInput): Expr
   /**
    * Inequality: returns `true` if this value does not equal `value`.
    * @param value - The value to compare against.
@@ -107,7 +109,7 @@ type CommonValueMethods = {
    * $.request.method.neq("delete")
    * ```
    */
-  neq(value: Expr): Expr
+  neq(value: RuleValueInput): Expr
   /**
    * Greater than: returns `true` if this value is greater than `value`.
    * @param value - The value to compare against.
@@ -116,7 +118,7 @@ type CommonValueMethods = {
    * $.resource.data.count.gt(0)
    * ```
    */
-  gt(value: Expr): Expr
+  gt(value: RuleValueInput): Expr
   /**
    * Greater than or equal: returns `true` if this value is >= `value`.
    * @param value - The value to compare against.
@@ -125,7 +127,7 @@ type CommonValueMethods = {
    * $.request.time.gte($.resource.data.createdAt)
    * ```
    */
-  gte(value: Expr): Expr
+  gte(value: RuleValueInput): Expr
   /**
    * Less than: returns `true` if this value is less than `value`.
    * @param value - The value to compare against.
@@ -134,7 +136,7 @@ type CommonValueMethods = {
    * $.request.time.lt($.resource.data.expiresAt)
    * ```
    */
-  lt(value: Expr): Expr
+  lt(value: RuleValueInput): Expr
   /**
    * Less than or equal: returns `true` if this value is <= `value`.
    * @param value - The value to compare against.
@@ -143,7 +145,7 @@ type CommonValueMethods = {
    * $.resource.data.priority.lte(10)
    * ```
    */
-  lte(value: Expr): Expr
+  lte(value: RuleValueInput): Expr
   /**
    * Arithmetic addition: returns `this + value`.
    * @param value - The value to add.
@@ -152,7 +154,7 @@ type CommonValueMethods = {
    * $.request.time.plus(3600)  // 1 hour later
    * ```
    */
-  plus(value: Expr): Expr
+  plus(value: RuleValueInput): Expr
   /**
    * Arithmetic subtraction: returns `this - value`.
    * @param value - The value to subtract.
@@ -161,7 +163,7 @@ type CommonValueMethods = {
    * $.resource.data.total.minus($.resource.data.discount)
    * ```
    */
-  minus(value: Expr): Expr
+  minus(value: RuleValueInput): Expr
   /**
    * Arithmetic multiplication: returns `this * value`.
    * @param value - The multiplier.
@@ -170,7 +172,7 @@ type CommonValueMethods = {
    * $.resource.data.quantity.multiply($.resource.data.unitPrice)
    * ```
    */
-  multiply(value: Expr): Expr
+  multiply(value: RuleValueInput): Expr
   /**
    * Arithmetic division: returns `this / value`.
    * @param value - The divisor.
@@ -179,7 +181,7 @@ type CommonValueMethods = {
    * $.resource.data.total.divide($.resource.data.count)
    * ```
    */
-  divide(value: Expr): Expr
+  divide(value: RuleValueInput): Expr
   /**
    * Modulo/remainder: returns `this % value`.
    * @param value - The divisor for the modulo operation.
@@ -188,7 +190,7 @@ type CommonValueMethods = {
    * $.resource.data.id.modulo(2).eq(0)  // true if id is even
    * ```
    */
-  modulo(value: Expr): Expr
+  modulo(value: RuleValueInput): Expr
 }
 
 /** List-specific helper methods available on array-like values. */
@@ -360,12 +362,18 @@ type ResourceProxy<TDoc> = {
   data: RuleValueProxy<TDoc>
 }
 
+/** Proxy shape for `request.auth` that supports both value methods and nested auth fields. */
+type RequestAuthProxy<TClaims extends Record<string, unknown>> = RuleValueProxy<{
+  uid: string
+  token: TClaims
+}> & {
+  uid: RuleValueProxy<string>
+  token: RuleValueProxy<TClaims>
+}
+
 /** Proxy shape for `request`. */
 type RequestProxy<TDoc, TClaims extends Record<string, unknown>> = {
-  auth: {
-    uid: RuleValueProxy<string>
-    token: RuleValueProxy<TClaims>
-  }
+  auth: RequestAuthProxy<TClaims>
   method: RuleValueProxy<string>
   path: RuleValueProxy<string>
   query: {
@@ -977,14 +985,54 @@ function createQueryProxy(): any {
  * @internal
  */
 function createAuthProxy(claims: Record<string, unknown>): any {
+  const authExpr = wrapExpressionInProxy(requestAuth())
+  const methodProps = new Set([
+    "is",
+    "eq",
+    "neq",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "plus",
+    "minus",
+    "multiply",
+    "divide",
+    "modulo",
+    "size",
+    "keys",
+    "diff",
+  ])
+
   return new Proxy(
     {},
     {
       get(_, prop: string | symbol) {
         if (prop === "uid") return wrapExpressionInProxy(requestAuthUid())
         if (prop === "token") return createTokenProxy(claims)
+        if (typeof prop === "string" && methodProps.has(prop)) {
+          return (authExpr as Record<string, unknown>)[prop]
+        }
         if (typeof prop === "string") {
-          throw unknownPropertyError("request.auth", prop, ["uid", "token"])
+          throw unknownPropertyError("request.auth", prop, [
+            "uid",
+            "token",
+            "is",
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "plus",
+            "minus",
+            "multiply",
+            "divide",
+            "modulo",
+            "size",
+            "keys",
+            "diff",
+          ])
         }
         return undefined
       },

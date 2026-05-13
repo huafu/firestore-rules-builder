@@ -66,6 +66,15 @@ describe("builder context types", () => {
     type _Missing = Ctx["request"]["auth"]["token"]["missingClaim"]
   })
 
+  it("exposes value methods on request.auth root", () => {
+    expectTypeOf<Ctx["request"]["auth"]>().toExtend<PublicExpression>()
+    expectTypeOf<Ctx["request"]["auth"]>().toHaveProperty("eq")
+    expectTypeOf<Ctx["request"]["auth"]>().toHaveProperty("neq")
+    expectTypeOf<Ctx["request"]["auth"]>().toHaveProperty("keys")
+
+    expectTypeOf<ReturnType<Ctx["request"]["auth"]["neq"]>>().toExtend<PublicExpression>()
+  })
+
   it("infers params from full path", () => {
     expectTypeOf<Ctx["params"]>().toEqualTypeOf<{ userId: string }>()
     expectTypeOf<PostCtx["params"]>().toEqualTypeOf<{ userId: string; postId: string }>()
@@ -102,5 +111,18 @@ describe("builder context types", () => {
     // But not AST properties
     expectTypeOf<TokenExpr>().not.toHaveProperty("kind")
     expectTypeOf<TokenExpr>().not.toHaveProperty("loc")
+  })
+
+  it("accepts primitive and null values in comparison helpers", () => {
+    expectTypeOf<ReturnType<Ctx["request"]["auth"]["neq"]>>().toExtend<PublicExpression>()
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["name"]["eq"]>>().toExtend<PublicExpression>()
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["name"]["gt"]>>().toExtend<PublicExpression>()
+
+    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>().toEqualTypeOf<
+      PublicExpression | string | number | boolean | null
+    >()
+    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>().toEqualTypeOf<
+      PublicExpression | string | number | boolean | null
+    >()
   })
 })

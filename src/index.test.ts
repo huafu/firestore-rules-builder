@@ -62,7 +62,9 @@ describe("root barrel real-world integration", () => {
     >
 
     const authHelpers = defineFirestoreRulesLibrary((ctx, register) => {
-      const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+      const isSignedIn = register("isSignedIn", [], () =>
+        ctx.and(ctx.request.auth.neq(null), ctx.request.auth.uid.neq(null)),
+      )
       const isOwner = register("isOwner", ["ownerId"], (_helperCtx, { ownerId }) => {
         return ctx.request.auth.uid.eq(ownerId)
       })

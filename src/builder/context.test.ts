@@ -100,6 +100,24 @@ describe("createBuilderContext runtime", () => {
     expect((complexExpr as unknown as ExpressionNode).kind).toBe("LogicalExpression")
   })
 
+  it("supports auth root null checks with method helpers", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.request.auth.neq(null)
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind")
+    expect((expr as ExpressionNode).kind).toBe("BinaryExpression")
+  })
+
+  it("supports fixed-string equality checks on resource fields", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.resource.data.email.eq("fixedString")
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind")
+    expect((expr as ExpressionNode).kind).toBe("BinaryExpression")
+  })
+
   it("throws for invalid params access", () => {
     const ctx = createBuilderContext<TestDb, "users/{userId}">({
       pathPattern: "users/{userId}",
