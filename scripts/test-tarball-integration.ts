@@ -55,11 +55,25 @@ const copyIntegrationFixtures = () => {
   writeFileSync(
     subpathTypecheckPath,
     [
-      'import type { Typesaurus } from "typesaurus"',
-      'import type { OfTypesaurus } from "firestore-rules-dsl/typesaurus"',
+      'import { schema, type Typesaurus } from "typesaurus"',
+      'import { createAstRulesBuilder } from "firestore-rules-dsl"',
+      'import { createTypesaurusRulesBuilder, type OfTypesaurus, type TypesaurusDatabaseDefinition } from "firestore-rules-dsl/typesaurus"',
       "",
-      "// Smoke test: the subpath type export resolves and composes with Typesaurus types.",
-      "type _Smoke = OfTypesaurus<Typesaurus.Schema<any>>",
+      "const db = schema(($) => ({ users: $.collection<{ name: string }>() }))",
+      "",
+      "// Smoke test: runtime builder export resolves from subpath.",
+      "const builder = createTypesaurusRulesBuilder(db)",
+      "builder.matches((match) => {",
+      '  match("users/{userId}", (users, $) => {',
+      '    users.allow("read", $.request.auth.uid.is("string"))',
+      "  })",
+      "})",
+      "",
+      "// Smoke test: type exports resolve and compose with Typesaurus and root builder APIs.",
+      "type _SchemaSmoke = OfTypesaurus<Typesaurus.Schema<typeof db>>",
+      "type _DefSmoke = TypesaurusDatabaseDefinition<typeof db, { admin: boolean }>",
+      "const typedBuilder = createAstRulesBuilder<_DefSmoke>()",
+      "typedBuilder.withCustomClaims<{ admin: boolean }>()",
       "",
     ].join("\n"),
   )
@@ -90,6 +104,7 @@ const main = () => {
   } as const
 
   try {
+    run("pnpm run build", { cwd: repoRoot, encoding: "utf8" })
     tarballPath = packTarball()
 
     copyIntegrationFixtures()

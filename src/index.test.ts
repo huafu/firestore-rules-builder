@@ -1,103 +1,180 @@
+import { describe, expect, it } from "vitest"
+
 import {
-  commonFirestoreRulesHelpers,
-  createFirestoreRulesBuilder,
-  type DbCollection,
+  createAstRulesBuilder,
+  defineFirestoreRulesLibrary,
+  type CollectionShape,
+  type DatabaseDefinition,
 } from "./index"
-import { describe, it, expect, beforeEach } from "vitest"
 
-type Schema = {
-  users: DbCollection<{
-    name: string
-    email: string
-    createdAt: Date
-    updatedAt: Date
-  }>
-  posts: DbCollection<
-    {
-      title: string
-      content: string
-      authorId: string
-      createdAt: Date
-      updatedAt: Date
-    },
-    {
-      comments: DbCollection<
-        {
-          text: string
-          commenterId: string
-          createdAt: Date
-          updatedAt: Date
-        },
-        {
-          likes: DbCollection<{
-            userId: string
-            createdAt: Date
-            updatedAt: Date
-          }>
-        }
-      >
+describe("root barrel real-world integration", () => {
+  it("comprehensive rules using all context helpers and methods", () => {
+    type UserDoc = {
+      displayName: string
+      email: string
+      createdAt: number
+      tags: string[]
+      metadata: Record<string, unknown>
     }
-  >
-}
 
-interface CustomClaims {
-  admin?: boolean
-  date?: Date
-}
+    type OrgDoc = {
+      name: string
+      ownerId: string
+      members: string[]
+      plan: "free" | "pro" | "enterprise"
+      quota: { projects: number }
+      created: number
+      updated: number
+    }
 
-const createBuilder = () => createFirestoreRulesBuilder<Schema, { authClaims: CustomClaims }>()
+    type ProjectDoc = {
+      name: string
+      ownerId: string
+      public: boolean
+      status: "active" | "archived"
+    }
 
-let builder: ReturnType<typeof createBuilder>
+    type InviteDoc = {
+      email: string
+      role: string
+      expiresAt: number
+      createdBy: string
+    }
 
-beforeEach(() => {
-  builder = createBuilder()
-})
+    type AppClaims = {
+      admin: boolean
+      orgId: string
+      userId: string
+    }
 
-describe("createFirestoreRulesBuilder", () => {
-  it("should render empty rules correctly", () => {
-    expect(builder.toString()).toMatchSnapshot()
-  })
+    type AppDb = DatabaseDefinition<
+      {
+        users: CollectionShape<UserDoc>
+        orgs: CollectionShape<
+          OrgDoc,
+          {
+            projects: CollectionShape<ProjectDoc>
+            invites: CollectionShape<InviteDoc>
+          }
+        >
+      },
+      AppClaims
+    >
 
-  it("should render rules correctly", () => {
-    builder.withHelpers(commonFirestoreRulesHelpers).sub((db) => {
-      db.users.rules(($) => ({
-        read: $.if($.isAuthenticated()),
-        update: $.if($.isOwner($.params.userId, true)),
-        delete: $.never(),
-      }))
-      db.posts
-        .rules(($) => ({
-          read: $.if($.isAuthenticated()),
-          create: $.if($.isAuthenticated()),
-          update: $.if(
-            $.isOwner($.resource.data.authorId, true),
-            $.hasOnlyModified(["title", "content", "updatedAt"]),
-            $.isServerTime("updatedAt"),
-          ),
-          delete: $.if(
-            $.isAuthenticated(),
-            $.orBlock(
-              $.isOwner($.resource.data.authorId),
-              $.eq($.request.auth.token.admin, $.true),
-            ),
-          ),
-        }))
-        .sub((posts) => {
-          posts.comments.rules(($) => ({
-            read: $.if($.isAuthenticated()),
-            create: $.if($.isAuthenticated()),
-            update: $.if(
-              $.isOwner($.resource.data.commenterId, true),
-              $.hasOnlyModified(["text", "updatedAt"]),
-              $.isServerTime("updatedAt"),
-            ),
-            delete: $.if(
-              $.isAuthenticated(),
-              $.orBlock($.isOwner($.resource.data.commenterId, true), $.hasClaim("admin", true)),
-            ),
-          }))
-        })
+    const authHelpers = defineFirestoreRulesLibrary((ctx, register) => {
+      const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+      const isOwner = register("isOwner", ["ownerId"], (_helperCtx, { ownerId }) => {
+        return ctx.request.auth.uid.eq(ownerId)
+      })
+      return { isSignedIn, isOwner }
     })
-    expect(builder.toString()).toMatchSnapshot()
+
+    const builder = createAstRulesBuilder<AppDb>()
+      .withHelpers(authHelpers)
+      .withHelpers((ctx, register) => {
+        const isAdmin = register("isAdmin", [], () => {
+          return ctx.request.auth.token.admin.eq(true)
+        })
+        const isMemberOfOrg = register("isMemberOfOrg", ["orgId"], (_helperCtx, { orgId }) => {
+          return ctx.request.auth.token.orgId.eq(orgId)
+        })
+        const notExpired = register("notExpired", ["expiresAt"], (_helperCtx, { expiresAt }) => {
+          return ctx.request.time.lt(expiresAt)
+        })
+        return { isAdmin, isMemberOfOrg, notExpired }
+      })
+
+    builder.matches((match) => {
+      // User documents: use $.request, $.resource, $.params, $.exists, $.get, arithmetic
+      match("users/{userId}", (users, $) => {
+        users.allow("read", $.or($.isOwner($.params.userId), $.isSignedIn()))
+
+        users.allow(
+          "create",
+          $.and($.isSignedIn(), $.request.resource.data.createdAt.eq($.request.time)),
+        )
+
+        users.allow("update", $.isOwner($.params.userId))
+
+        users.allow("delete", $.or($.isOwner($.params.userId), $.isAdmin()))
+      })
+
+      // Orgs: use $.getAfter, logical operators, nested collections
+      match("orgs/{orgId}", (orgs, $) => {
+        orgs.allow("read", $.isMemberOfOrg($.params.orgId))
+
+        orgs.allow(
+          "create",
+          $.and(
+            $.isSignedIn(),
+            $.request.resource.data.ownerId.eq($.request.auth.uid),
+            $.request.resource.data.plan.eq("free"),
+          ),
+        )
+
+        orgs.allow("update", $.or($.isAdmin(), $.isOwner($.resource.data.ownerId)))
+
+        orgs.allow("delete", $.isAdmin())
+
+        // Nested projects with public access check
+        orgs.matches((match) => {
+          match("projects/{projectId}", (projects, $) => {
+            projects.allow(
+              "read",
+              $.or(
+                $.resource.data.public.eq(true),
+                $.and($.isMemberOfOrg($.params.orgId), $.resource.data.status.eq("active")),
+              ),
+            )
+
+            projects.allow(
+              "create",
+              $.and(
+                $.isMemberOfOrg($.params.orgId),
+                $.request.resource.data.ownerId.eq($.request.auth.uid),
+                $.request.resource.data.status.eq("active"),
+              ),
+            )
+
+            projects.allow(
+              "update",
+              $.or(
+                $.isOwner($.resource.data.ownerId),
+                $.and($.isAdmin(), $.not($.resource.data.status.eq("deleted"))),
+              ),
+            )
+
+            projects.allow("delete", $.isOwner($.resource.data.ownerId))
+          })
+        })
+
+        // Nested invites with time-based expiry
+        orgs.matches((match) => {
+          match("invites/{inviteId}", (invites, $) => {
+            invites.allow(
+              "read",
+              $.and($.isMemberOfOrg($.params.orgId), $.notExpired($.resource.data.expiresAt)),
+            )
+
+            invites.allow(
+              "create",
+              $.and(
+                $.isMemberOfOrg($.params.orgId),
+                $.op($.request.resource.data.expiresAt, ">", $.request.time),
+                $.request.resource.data.expiresAt.lte($.request.time.plus(2592000)),
+              ),
+            )
+
+            invites.allow(
+              "delete",
+              $.and($.notExpired($.resource.data.expiresAt), $.isOwner($.resource.data.createdBy)),
+            )
+          })
+        })
+      })
+    })
+
+    const source = builder.toString()
+    expect(source).toMatchSnapshot()
   })
 })

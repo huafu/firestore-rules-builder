@@ -57,6 +57,22 @@ importers:
         specifier: ^4
         version: 4.1.5(@types/node@24.12.3)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@24.12.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0))
 
+  .tmp/integration:
+    dependencies:
+      firestore-rules-dsl:
+        specifier: file:/Users/huafu/Work/libs/@huafu/firestore-rules-builder/firestore-rules-dsl-0.4.2.tgz
+        version: file:firestore-rules-dsl-0.4.2.tgz(typesaurus@10.7.0)
+    devDependencies:
+      typesaurus:
+        specifier: ^10.7.0
+        version: 10.7.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(vite@8.0.11)
+
 packages:
 
   '@babel/code-frame@7.29.0':
@@ -904,6 +920,16 @@ packages:
   find-up@5.0.0:
     resolution: {integrity: sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==}
     engines: {node: '>=10'}
+
+  firestore-rules-dsl@file:firestore-rules-dsl-0.4.2.tgz:
+    resolution: {integrity: sha512-fRntw9rvojxDZPAbVRR/JYAnA2vmdEcLWxIo+Mm3a5Pz+Lvy+DjrcMD08M2jGlx2pXu3cE5iLhBHhjt8YhNWDA==, tarball: file:firestore-rules-dsl-0.4.2.tgz}
+    version: 0.4.2
+    engines: {node: '>=20'}
+    peerDependencies:
+      typesaurus: ^10
+    peerDependenciesMeta:
+      typesaurus:
+        optional: true
 
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
@@ -2055,6 +2081,14 @@ snapshots:
     optionalDependencies:
       vite: 8.0.11(@types/node@24.12.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)
 
+  '@vitest/mocker@4.1.5(vite@8.0.11)':
+    dependencies:
+      '@vitest/spy': 4.1.5
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 8.0.11
+
   '@vitest/pretty-format@4.1.5':
     dependencies:
       tinyrainbow: 3.1.0
@@ -2352,6 +2386,10 @@ snapshots:
     dependencies:
       locate-path: 6.0.0
       path-exists: 4.0.0
+
+  firestore-rules-dsl@file:firestore-rules-dsl-0.4.2.tgz(typesaurus@10.7.0):
+    optionalDependencies:
+      typesaurus: 10.7.0
 
   flat-cache@4.0.1:
     dependencies:
@@ -2783,6 +2821,16 @@ snapshots:
       - typescript
       - webpack
 
+  vite@8.0.11:
+    dependencies:
+      lightningcss: 1.32.0
+      picomatch: 4.0.4
+      postcss: 8.5.14
+      rolldown: 1.0.0-rc.18
+      tinyglobby: 0.2.16
+    optionalDependencies:
+      fsevents: 2.3.3
+
   vite@8.0.11(@types/node@24.12.3)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0):
     dependencies:
       lightningcss: 1.32.0
@@ -2822,6 +2870,31 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.12.3
       '@vitest/coverage-v8': 4.1.5(vitest@4.1.5)
+    transitivePeerDependencies:
+      - msw
+
+  vitest@4.1.5(vite@8.0.11):
+    dependencies:
+      '@vitest/expect': 4.1.5
+      '@vitest/mocker': 4.1.5(vite@8.0.11)
+      '@vitest/pretty-format': 4.1.5
+      '@vitest/runner': 4.1.5
+      '@vitest/snapshot': 4.1.5
+      '@vitest/spy': 4.1.5
+      '@vitest/utils': 4.1.5
+      es-module-lexer: 2.1.0
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.4
+      std-env: 4.1.0
+      tinybench: 2.9.0
+      tinyexec: 1.1.2
+      tinyglobby: 0.2.16
+      tinyrainbow: 3.1.0
+      vite: 8.0.11
+      why-is-node-running: 2.3.0
     transitivePeerDependencies:
       - msw
 

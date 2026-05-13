@@ -36,13 +36,30 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./typesaurus": {
-      "types": "./dist/typesaurus.d.ts"
+    "./ast": {
+      "types": "./dist/ast/index.d.ts",
+      "import": "./dist/ast.js",
+      "require": "./dist/ast.cjs"
+    },
+    "./builder": {
+      "types": "./dist/builder/index.d.ts",
+      "import": "./dist/builder.js",
+      "require": "./dist/builder.cjs"
+    },
+    "./library": {
+      "types": "./dist/library/index.d.ts",
+      "import": "./dist/library.js",
+      "require": "./dist/library.cjs"
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
+      "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing.js",
       "require": "./dist/testing.cjs"
+    },
+    "./typesaurus": {
+      "types": "./dist/typesaurus/index.d.ts",
+      "import": "./dist/typesaurus.js",
+      "require": "./dist/typesaurus.cjs"
     }
   },
   "scripts": {

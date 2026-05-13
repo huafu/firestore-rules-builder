@@ -1,14 +1,15 @@
 # Firestore Rules DSL
 
-Type-safe builder for Firebase Firestore Security Rules.
+Strongly typed builder for writing Firebase Firestore Security Rules in TypeScript.
 
 [![npm version](https://img.shields.io/npm/v/firestore-rules-dsl.svg)](https://www.npmjs.com/package/firestore-rules-dsl)
 [![npm downloads](https://img.shields.io/npm/dm/firestore-rules-dsl.svg)](https://www.npmjs.com/package/firestore-rules-dsl)
 [![CI](https://img.shields.io/github/actions/workflow/status/huafu/firestore-rules-builder/ci.yml?branch=develop&label=CI)](https://github.com/huafu/firestore-rules-builder/actions/workflows/ci.yml)
-[![Publish](https://img.shields.io/github/actions/workflow/status/huafu/firestore-rules-builder/publish.yml?label=Publish)](https://github.com/huafu/firestore-rules-builder/actions/workflows/publish.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-It lets you describe your Firestore schema once, write rules against a typed context, register reusable helper functions, and render a complete `firestore.rules` source file.
+The goal of this package is to help you author Firestore rules with a strongly typed developer experience.
+
+It does not model or manage your runtime database. The schema types you provide are only used to drive compile-time typing for rule context properties, helper signatures, and expression methods.
 
 ## Install
 
@@ -18,446 +19,251 @@ pnpm add firestore-rules-dsl
 
 ## What You Get
 
-- Typed collection schemas with nested subcollections.
-- Typed rule contexts for `request`, `resource`, `params`, `db`, and parent loaders.
-- Composable expression helpers for Firestore rule syntax.
-- Reusable helper registration with automatic helper emission.
-- Deterministic rule rendering with optional comments stripping and indentation control.
+- A root builder via `createAstRulesBuilder(...)`.
+- Typed `match` callbacks via `matches(...)`.
+- Typed rule declarations via `allow(...)`.
+- A typed context (`$`) with `request`, `resource`, `request.resource`, `params`, `db`, and helper methods.
+- Reusable helper libraries via `defineFirestoreRulesLibrary(...)`.
+- Deterministic rules output via `toString()`.
 
 ## Quick Start
 
 ```ts
 import {
-  commonFirestoreRulesHelpers,
-  createFirestoreRulesBuilder,
-  type DbCollection,
+  createAstRulesBuilder,
+  defineFirestoreRulesLibrary,
+  type CollectionShape,
+  type DatabaseDefinition,
 } from "firestore-rules-dsl"
 
-type Schema = {
-  users: DbCollection<{
-    name: string
-    email: string
-    createdAt: Date
-    updatedAt: Date
-  }>
-  posts: DbCollection<
-    {
-      title: string
-      content: string
-      authorId: string
-      createdAt: Date
-      updatedAt: Date
-    },
-    {
-      comments: DbCollection<{
-        text: string
-        commenterId: string
-        createdAt: Date
-        updatedAt: Date
-      }>
-    }
-  >
+type UserDoc = {
+  displayName: string
+  email: string
+  createdAt: number
 }
 
-const builder = createFirestoreRulesBuilder<
-  Schema,
+type OrgDoc = {
+  name: string
+  ownerId: string
+  plan: "free" | "pro" | "enterprise"
+}
+
+type AppClaims = {
+  admin: boolean
+  orgId: string
+}
+
+type AppDb = DatabaseDefinition<
   {
-    authClaims: {
-      admin?: boolean
-    }
-  }
->()
+    users: CollectionShape<UserDoc>
+    orgs: CollectionShape<OrgDoc>
+  },
+  AppClaims
+>
 
-builder.withHelpers(commonFirestoreRulesHelpers).sub((db) => {
-  db.users.rules(($) => ({
-    read: $.if($.isAuthenticated()),
-    update: $.if($.isOwner($.params.userId, true)),
-    delete: $.never(),
-  }))
+const authHelpers = defineFirestoreRulesLibrary((ctx, register) => {
+  const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+  const isOwner = register("isOwner", ["ownerId"], (_helperCtx, { ownerId }) => {
+    return ctx.request.auth.uid.eq(ownerId)
+  })
 
-  db.posts
-    .rules(($) => ({
-      read: $.if($.isAuthenticated()),
-      create: $.if($.isAuthenticated()),
-      update: $.if(
-        $.and(
-          $.isOwner($.resource.data.authorId, true),
-          $.hasOnlyModified(["title", "content", "updatedAt"]),
-          $.isServerTime("updatedAt"),
-        ),
-      ),
-    }))
-    .sub((posts) => {
-      posts.comments.rules(($) => ({
-        create: $.if($.isAuthenticated()),
-        delete: $.if($.or($.isOwner($.resource.data.commenterId, true), $.hasClaim("admin", true))),
-      }))
-    })
+  return { isSignedIn, isOwner }
 })
 
-const rules = builder.toString()
-console.log(rules)
+const builder = createAstRulesBuilder<AppDb>()
+  .withHelpers(authHelpers)
+  .withHelpers((ctx, register) => {
+    const isAdmin = register("isAdmin", [], () => ctx.request.auth.token.admin.eq(true))
+    return { isAdmin }
+  })
+
+builder.matches((match) => {
+  match("users/{userId}", (users, $) => {
+    users.allow("read", $.or($.isOwner($.params.userId), $.isSignedIn()))
+
+    users.allow(
+      "create",
+      $.and($.isSignedIn(), $.request.resource.data.createdAt.eq($.request.time)),
+    )
+
+    users.allow("update", $.isOwner($.params.userId))
+    users.allow("delete", $.or($.isOwner($.params.userId), $.isAdmin()))
+  })
+})
+
+const rulesSource = builder.toString()
+console.log(rulesSource)
 ```
 
-## Generated Output
+## Core API
 
-Rendered output is regular Firestore rules source, including emitted helper functions that are actually used by your rules:
+### `DatabaseDefinition` and `CollectionShape`
 
-```firestore
-// Firestore Security Rules generated by firestore-rules-dsl
-// DO NOT EDIT THIS FILE DIRECTLY. Edit the TypeScript source and regenerate.
-
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // ****[ HELPERS ]******************************************************************************
-
-    // ====[ isAuthenticated ]======================================================================
-    function isAuthenticated() {
-      return request.auth != null
-        && request.auth.uid != null;
-    }
-
-    // ====[ hasClaim ]=============================================================================
-    function hasClaim(claim, expected) {
-      return request.auth.token[claim] == expected;
-    }
-
-    // ****[ RULES ]********************************************************************************
-    ...
-  }
-}
-```
-
-## Schema Model
-
-Use `DbCollection<Data, Children, Id>` to describe a collection.
+Use `DatabaseDefinition<TCollections, TCustomClaims>` and `CollectionShape<TDoc, TSubcollections>` to provide type information for the rule context.
 
 ```ts
-type BlogSchema = {
-  users: DbCollection<{
-    displayName: string
-    createdAt: Date
-  }>
-  posts: DbCollection<
-    {
-      title: string
-      authorId: string
-      createdAt: Date
-      updatedAt: Date
-    },
-    {
-      comments: DbCollection<{
-        text: string
-        commenterId: string
-        createdAt: Date
-      }>
-    }
-  >
-}
+type AppDb = DatabaseDefinition<
+  {
+    orgs: CollectionShape<
+      { name: string; ownerId: string },
+      {
+        projects: CollectionShape<{ name: string; ownerId: string }>
+      }
+    >
+  },
+  { admin: boolean }
+>
 ```
 
-`Data` becomes the shape of `resource.data` and `request.resource.data`.
+These types are compile-time only and exist to power autocomplete, inference, and safety in your rules code.
 
-`Children` declares subcollections below each document of the collection.
+### `createAstRulesBuilder(...)`
 
-`Id` lets you override the type exposed through `resource.id`. If omitted, it defaults to `string`.
+`createAstRulesBuilder<Db>()` creates the root builder.
+
+You can then:
+
+1. call `withHelpers(...)` to register helper libraries,
+2. call `matches(...)` to define path scopes,
+3. call `allow(...)` on each match builder,
+4. call `toString()` to render Firestore rules text.
+
+### `matches(...)`
+
+Use `matches(...)` to define nested `match` scopes.
+
+```ts
+builder.matches((match) => {
+  match("orgs/{orgId}", (orgs, $) => {
+    orgs.allow("read", $.request.auth.uid.is("string"))
+
+    orgs.matches((match) => {
+      match("projects/{projectId}", (projects, $) => {
+        projects.allow("read", $.resource.data.ownerId.eq($.request.auth.uid))
+      })
+    })
+  })
+})
+```
+
+### `allow(...)`
+
+Use `allow(operation, condition)` to attach a rule condition to one or more operations.
+
+```ts
+users.allow("read", $.request.auth.uid.is("string"))
+users.allow("update", $.resource.data.ownerId.eq($.request.auth.uid))
+users.allow(["create", "delete"], $.request.auth.token.admin.eq(true))
+```
+
+### `defineFirestoreRulesLibrary(...)`
+
+Use `defineFirestoreRulesLibrary(...)` to publish reusable helper libraries with full typing preserved.
+
+```ts
+import { defineFirestoreRulesLibrary } from "firestore-rules-dsl"
+
+export const sharedHelpers = defineFirestoreRulesLibrary((ctx, register) => {
+  const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+  const isAdmin = register("isAdmin", [], () => ctx.request.auth.token.admin.eq(true))
+
+  return { isSignedIn, isAdmin }
+})
+```
+
+Then attach them with `withHelpers(...)`.
+
+## Context Reference
+
+Inside each `match` callback, `$` is strongly typed.
+
+### Core context objects
+
+- `$.request.auth.uid`
+- `$.request.auth.token.<claim>`
+- `$.request.method`
+- `$.request.path`
+- `$.request.time`
+- `$.request.resource.data` (incoming document data for writes)
+- `$.resource.data` (existing persisted document data)
+- `$.params.<segmentName>`
+- `$.db` (schema-aware traversal for `exists(...)` and `get(...)` patterns)
+
+### Global context helpers
+
+- `$.exists(path)`
+- `$.get(path)`
+- `$.getAfter(path)`
+- `$.and(...conditions)`
+- `$.or(...conditions)`
+- `$.not(condition)`
+- `$.op(left, operator, right)`
+- `$.duration.abs(...)`, `$.duration.time(...)`, `$.duration.value(...)`
+- `$.hashing.md5(...)`, `$.hashing.sha256(...)`
+- `$.math.abs(...)`, `$.math.ceil(...)`, `$.math.floor(...)`, `$.math.pow(...)`, `$.math.round(...)`, `$.math.sqrt(...)`
+
+### Value methods
+
+Comparison and arithmetic:
+
+- `.is(...)`
+- `.eq(...)`, `.neq(...)`, `.gt(...)`, `.gte(...)`, `.lt(...)`, `.lte(...)`
+- `.plus(...)`, `.minus(...)`, `.multiply(...)`, `.divide(...)`, `.modulo(...)`
+
+List methods:
+
+- `.size()`
+- `.hasAll(...)`, `.hasAny(...)`, `.hasOnly(...)`
+- `.join(...)`, `.concat(...)`, `.removeAll(...)`, `.toSet()`
+
+Map methods:
+
+- `.size()`
+- `.keys()`
+- `.diff(...)` with `.addedKeys()`, `.removedKeys()`, `.changedKeys()`, `.affectedKeys()`, `.unchangedKeys()`
 
 ## Typesaurus Integration
 
-If you already define your Firestore schema with [Typesaurus](https://typesaurus.com/), you can reuse it directly instead of re-declaring a `DbCollection` schema by hand.
-
-Install `typesaurus` as a dependency, then import `OfTypesaurus` from the dedicated subpath (keeping the peer dependency optional for projects that don't use Typesaurus):
+If your schema is already defined with Typesaurus, use `createTypesaurusRulesBuilder(...)` from the `typesaurus` subpath.
 
 ```ts
-import { schema, type Typesaurus } from "typesaurus"
-import type { OfTypesaurus } from "firestore-rules-dsl/typesaurus"
-import { createFirestoreRulesBuilder } from "firestore-rules-dsl"
+import { schema } from "typesaurus"
+import { createTypesaurusRulesBuilder } from "firestore-rules-dsl/typesaurus"
 
 const db = schema(($) => ({
-  users: $.collection<User>(),
-  posts: $.collection<Post>().sub({
-    comments: $.collection<Comment>(),
-  }),
+  users: $.collection<{ name: string }>(),
 }))
 
-// Pass the db instance directly:
-const builder = createFirestoreRulesBuilder<OfTypesaurus<typeof db>>()
+const builder = createTypesaurusRulesBuilder(db).withCustomClaims<{
+  admin: boolean
+  orgId: string
+}>()
 
-// Or pass the inferred schema type:
-type Schema = Typesaurus.Schema<typeof db>
-const builder2 = createFirestoreRulesBuilder<OfTypesaurus<Schema>>()
-```
-
-`OfTypesaurus` accepts either the database instance (`typeof db`) or the schema type (`Typesaurus.Schema<typeof db>`) and converts it into the `DbCollection`-based format expected by the builder, including nested subcollections and typed document IDs.
-
-Because the integration lives in a separate subpath (`firestore-rules-dsl/typesaurus`), `typesaurus` is declared as an **optional peer dependency** — projects that don't use Typesaurus are not affected.
-
-## Builder Model
-
-The builder is hierarchical.
-
-```ts
-const builder = createFirestoreRulesBuilder<Schema>()
-```
-
-You then compose rules in this order:
-
-1. `withHelpers(...)` to extend the rule context.
-2. `collection(...)` or `sub(...)` to move through the schema.
-3. `rules(($) => ({ ... }))` to define collection operations.
-4. `toString()` on the root builder to render the final file.
-
-### Root Builder
-
-The root builder starts at the database namespace, so `sub(...)` is often the most natural way to define top-level collections:
-
-```ts
-createFirestoreRulesBuilder<Schema>().sub((db) => {
-  db.users.rules(($) => ({
-    read: $.if($.isAuthenticated()),
-  }))
+builder.matches((match) => {
+  match("users/{userId}", (users, $) => {
+    users.allow("read", $.request.auth.token.admin)
+  })
 })
 ```
 
-### Child Builders
+The backward-compatible `OfTypesaurus` alias is also exported for existing codebases.
 
-`collection(name)` returns the child builder for a direct collection.
+## Package Exports
 
-```ts
-builder.collection("posts").rules(($) => ({
-  read: $.if($.isAuthenticated()),
-}))
-```
+- `firestore-rules-dsl`
+- `firestore-rules-dsl/ast`
+- `firestore-rules-dsl/builder`
+- `firestore-rules-dsl/library`
+- `firestore-rules-dsl/testing`
+- `firestore-rules-dsl/typesaurus`
 
-Repeated calls reuse the same child builder, so helpers and rules accumulate on a single subtree.
+## Migration Notes
 
-### Rendering
+If you are migrating from earlier versions:
 
-Only the root builder renders the full rules file:
-
-```ts
-const source = builder.toString()
-```
-
-## Rule Context
-
-Inside `rules(($) => ({ ... }))`, the `$` context is strongly typed for the current collection.
-
-### Core Expression Helpers
-
-- Constants: `true`, `false`, `null`
-- Raw and literal helpers: `raw`, `const`, `expr`
-- Rules definition: `if`, `unless`, `always`, `never`
-- Control flow: `ternary`, `select`
-- Logic: `and`, `andBlock`, `or`, `orBlock`, `not`, `parens`, `join`
-- Comparisons: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `isset`
-
-Example:
-
-```ts
-posts.comments.rules(($) => ({
-  delete: $.if($.or($.isOwner($.resource.data.commenterId, true), $.hasClaim("admin", true))),
-}))
-```
-
-### Runtime Proxies
-
-- `request` for request fields such as `request.auth.uid` or `request.time`
-- `resource` for the current stored document
-- `params` for route parameters like `userId` or `postId`
-
-Example:
-
-```ts
-builder.collection("users").rules(($) => ({
-  update: $.if($.eq($.request.auth.uid, $.params.userId)),
-}))
-```
-
-### Collection Data Helpers
-
-Collection rule callbacks also get:
-
-- `hasOnlyModified(keys)`
-- `hasOnlyKeys(keys)`
-- `hasAllKeys(keys)`
-
-Example:
-
-```ts
-builder.collection("posts").rules(($) => ({
-  update: $.if($.hasOnlyModified(["title", "content", "updatedAt"])),
-}))
-```
-
-### Database Traversal
-
-`db` lets you build Firestore `exists(...)` and `get(...)` expressions with schema-aware traversal.
-
-```ts
-builder.collection("posts").rules(($) => ({
-  create: $.if($.db.users($.request.auth.uid).$exists()),
-}))
-```
-
-### Parent Loaders For Nested Collections
-
-Nested collection contexts expose `parent` loaders keyed by ancestor collection names.
-
-```ts
-builder
-  .collection("posts")
-  .collection("comments")
-  .rules(($) => ({
-    read: $.if($.eq($.parent.posts.$get().data.authorId, $.request.auth.uid)),
-  }))
-```
-
-## Built-In Helper Library
-
-`commonFirestoreRulesHelpers` registers a small, practical helper set:
-
-- `isAuthenticated()`
-- `hasClaim(claim, expected)`
-- `isOwner(uid, checkAuth?)`
-- `isServerTime(timestampOrKey)`
-
-```ts
-builder.withHelpers(commonFirestoreRulesHelpers)
-```
-
-These helpers are available in subsequent `rules(...)` callbacks and are emitted into the generated rules file only when they are actually used.
-
-## Custom Helpers
-
-Define helper libraries as plain functions with the same signature used by
-`commonFirestoreRulesHelpers`:
-
-```ts
-import type {
-  AnyDbNamespace,
-  AnyDbSchema,
-  ClaimKeyFor,
-  DataKeysFor,
-  RegisterHelper,
-  RuleContextFor,
-} from "firestore-rules-dsl"
-
-export const blogRulesHelpers = <Db extends AnyDbSchema, Ns extends AnyDbNamespace, Lib>(
-  context: RuleContextFor<Db, Ns, Lib>,
-  register: RegisterHelper,
-) => {
-  const isSignedIn = register("isSignedIn", [], () =>
-    context.return(context.isset(context.request.auth.uid)),
-  )
-
-  const canEditPost = register("canEditPost", ["authorId"] as const, ({ authorId }) =>
-    context.return(context.eq(context.request.auth.uid, authorId)),
-  )
-
-  // DataKeysFor<Ns> keeps the key aligned with the current collection data shape.
-  const isServerTimestamp = (field: DataKeysFor<Ns>) =>
-    context.eq(context.request.resource.data[field], context.request.time)
-
-  // ClaimKeyFor<Db> keeps claim keys aligned with Meta["authClaims"].
-  const noClaim = (claim: ClaimKeyFor<Db>) =>
-    context.eq(context.request.auth.token.$prop(claim), context.null)
-
-  return {
-    isSignedIn,
-    canEditPost,
-    isServerTimestamp,
-    noClaim,
-  }
-}
-```
-
-For helper libraries, these two type helpers are especially useful:
-
-- `DataKeysFor<Ns>` for collection data field keys (for example, `"ownerId"`, `"createdAt"`).
-- `ClaimKeyFor<Db>` for auth claim keys based on your builder metadata.
-
-Then pass the library to `withHelpers(...)`:
-
-```ts
-const builder = createFirestoreRulesBuilder<Schema>().withHelpers(blogRulesHelpers)
-```
-
-You can also define helpers inline when reuse is not needed:
-
-```ts
-const builder = createFirestoreRulesBuilder<Schema>().withHelpers(($, register) => ({
-  isSignedIn: register("isSignedIn", [], () => $.return($.isset($.request.auth))),
-
-  canEditPost: register("canEditPost", ["authorId"] as const, ({ authorId }) =>
-    $.return($.and($.isset($.request.auth), $.eq($.request.auth.uid, authorId))),
-  ),
-
-  inlineHelper: () => $.eq($.resource.createdAt, $.request.time), // This helper is defined but not registered, so it won't be emitted or tracked as a dependency.
-}))
-```
-
-There are two useful patterns:
-
-- For simple helpers with only one statement, returning a bare expression is enough.
-- For multi-line helper bodies, `$.return(...)` produces an explicit `return ...;` statement in the generated helper function.
-
-Helpers registered through `register(...)` render as named Firestore functions, and helper dependencies are tracked automatically.
-
-## Output Formatting
-
-`toString(options?)` accepts:
-
-```ts
-type FormattingOptions = {
-  stripComments?: boolean
-  indentationLevel?: number
-}
-```
-
-Example:
-
-```ts
-const source = builder.toString({
-  stripComments: true,
-  indentationLevel: 1,
-})
-```
-
-## Errors
-
-The package exports `RuleError` for rule-building and render-time failures.
-
-Common failure cases include:
-
-- duplicate helper names
-- duplicate rule definitions for the same operation on one collection
-- conflicting operations in the same rendered rule map
-- invalid collection access through namespace maps
-- rendering from a non-root builder
-
-## Public Exports
-
-Main exports (`firestore-rules-dsl`):
-
-- `createFirestoreRulesBuilder`
-- `commonFirestoreRulesHelpers`
-- `DbCollection`
-- `RuleContextFor`
-- `RuleExpression`
-- `RuleOperand`
-- `RegisterHelper`
-- `DbMeta`
-- `DataKeysFor`
-- `ClaimKeyFor`
-- `AnyDbNamespace`
-- `AnyDbSchema`
-- `RuleError`
-
-Typesaurus integration exports (`firestore-rules-dsl/typesaurus`):
-
-- `OfTypesaurus`
+- `createFirestoreRulesBuilder(...)` was replaced by `createAstRulesBuilder(...)`.
+- rule definition moved to `matches(...)` plus `allow(...)`.
+- helper libraries should be authored with `defineFirestoreRulesLibrary(...)`.
 
 ## Development
 
