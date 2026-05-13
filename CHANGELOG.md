@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.3...v1.0.0) (2026-05-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* 💥 AST, context-level operators, comprehensive method TSDoc, real-world integration test ([#19](https://github.com/huafu/firestore-rules-dsl/issues/19))
+
+### Code Refactoring
+
+* 💥 AST, context-level operators, comprehensive method TSDoc, real-world integration test ([#19](https://github.com/huafu/firestore-rules-dsl/issues/19)) ([842fc03](https://github.com/huafu/firestore-rules-dsl/commit/842fc03454904a039f5ade6941361a8f4e5c410d))
+
 ## [0.4.3](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.2...v0.4.3) (2026-05-10)
 
 
