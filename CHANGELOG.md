@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/huafu/firestore-rules-dsl/compare/v1.0.0...v1.1.0) (2026-05-13)
+
+
+### Features
+
+* ✨ make `_db` optional in `createTypesaurusRulesBuilder`, allow options as first arg ([#21](https://github.com/huafu/firestore-rules-dsl/issues/21)) ([0f7edb2](https://github.com/huafu/firestore-rules-dsl/commit/0f7edb28db0e30ae4078c8ffe3c7c920b033e30b))
+
 ## [1.0.0](https://github.com/huafu/firestore-rules-dsl/compare/v0.4.3...v1.0.0) (2026-05-13)
 
 
