@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/huafu/firestore-rules-dsl/compare/v1.1.0...v1.1.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* 🐛 restore helper library typing compatibility after auth proxy changes ([#23](https://github.com/huafu/firestore-rules-dsl/issues/23)) ([0d28728](https://github.com/huafu/firestore-rules-dsl/commit/0d28728a406609b6966f7331a4e350df967a5812))
+
 ## [1.1.0](https://github.com/huafu/firestore-rules-dsl/compare/v1.0.0...v1.1.0) (2026-05-13)
 
 
