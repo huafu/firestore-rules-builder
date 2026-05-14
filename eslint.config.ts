@@ -5,7 +5,13 @@ import tseslint from "typescript-eslint"
 
 export default defineConfig(
   {
-    ignores: ["dist/**", "node_modules/**", "coverage/**", "commitlint.config.cjs"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "coverage/**",
+      "packages/demo/dist/**",
+      "commitlint.config.cjs",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
@@ -54,6 +60,26 @@ export default defineConfig(
       "@typescript-eslint/no-unsafe-argument": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-return": "off",
+    },
+  },
+  {
+    files: ["packages/demo/**/*.ts", "packages/demo/**/*.tsx"],
+    languageOptions: {
+      parserOptions: {
+        project: "./packages/demo/tsconfig.json",
+      },
+      globals: {
+        ...globals.browser,
+      },
+    },
+    rules: {
+      "@typescript-eslint/restrict-template-expressions": [
+        "error",
+        {
+          allowNumber: true,
+          allowRegExp: true,
+        },
+      ],
     },
   },
 )

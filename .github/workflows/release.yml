@@ -43,8 +43,8 @@ jobs:
       - name: Build library
         run: pnpm run build
 
-      - name: Integration test
-        run: pnpm run test:tarball-integration
+      - name: Check package exports
+        run: pnpm run check:exports
 
       - name: Run Release Please
         id: release
