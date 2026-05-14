@@ -9,7 +9,7 @@ const rawDistDtsFiles = import.meta.glob<string>("../../../dist/**/*.d.ts", {
 })
 
 function stripMapComment(source: string): string {
-  return source.replace(/\n\/\/\# sourceMappingURL=.*$/g, "")
+  return source.replace(/\n\/\/# sourceMappingURL=.*$/g, "")
 }
 
 function toVirtualDistPath(globPath: string): string {
@@ -90,20 +90,37 @@ export function configureMonaco(monaco: Monaco): void {
       "false",
       "null",
     ],
+    builtins: [
+      "request",
+      "resource",
+      "resourceId",
+      "auth",
+      "token",
+      "uid",
+      "data",
+      "database",
+      "documents",
+      "time",
+    ],
     tokenizer: {
       root: [
-        [/rules_version/, "keyword"],
+        [/rules_version/, "keyword.directive"],
+        [/(get|list|create|update|delete)\b/, "keyword.permission"],
+        [/\$[a-zA-Z_][\w]*/, "variable.parameter"],
+        [/[a-zA-Z_][\w]*(?=\s*\()/, "entity.name.function"],
         [
-          /[a-zA-Z_][\\w]*/,
+          /[a-zA-Z_][\w]*/,
           {
             cases: {
               "@keywords": "keyword",
+              "@builtins": "support.variable",
               "@default": "identifier",
             },
           },
         ],
         [/[{}()[\]]/, "delimiter.bracket"],
-        [/"[^\"]*"|'[^']*'/, "string"],
+        [/[.,;:]/, "delimiter"],
+        [/"[^"]*"|'[^']*'/, "string"],
         [/\d+/, "number"],
         // Firestore rules support single-line comments (//), not block comments.
         [/\/\/.*$/, "comment"],
@@ -116,12 +133,20 @@ export function configureMonaco(monaco: Monaco): void {
     base: "vs-dark",
     inherit: true,
     rules: [
+      { token: "keyword.directive", foreground: "79F2E2", fontStyle: "bold" },
       { token: "keyword", foreground: "8AF5D2", fontStyle: "bold" },
+      { token: "keyword.permission", foreground: "FFB366", fontStyle: "bold" },
+      { token: "entity.name.function", foreground: "9BC3FF" },
+      { token: "variable.parameter", foreground: "F5A8D0" },
+      { token: "support.variable", foreground: "7EE6F5" },
+      { token: "constant.language", foreground: "B7A7FF" },
       { token: "identifier", foreground: "E8F1FF" },
       { token: "string", foreground: "F7C873" },
       { token: "number", foreground: "B4A6FF" },
       { token: "comment", foreground: "6D8AA8" },
       { token: "operator", foreground: "8FB7FF" },
+      { token: "delimiter", foreground: "5F7AA4" },
+      { token: "delimiter.bracket", foreground: "7FA5D9" },
     ],
     colors: {
       "editor.background": "#0B1322",

@@ -12,11 +12,6 @@ type PreviewState = {
   error: string | null
 }
 
-const dslRuntime = {
-  createAstRulesBuilder,
-  defineFirestoreRulesLibrary,
-}
-
 function normalizeSourceForExecution(source: string): string {
   return source.replace(/^\s*import\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm, "")
 }
@@ -44,10 +39,12 @@ function compileRules(source: string): PreviewState {
       }
     }
 
+    // Runtime execution is required for the playground preview.
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
     const runner = new Function(
       "createAstRulesBuilder",
       "defineFirestoreRulesLibrary",
-      `${transpiled.outputText}\nif (typeof buildRules !== \"function\") { throw new Error(\"Please define function buildRules() { ... }\") }\nreturn buildRules();`,
+      `${transpiled.outputText}\nif (typeof buildRules !== "function") { throw new Error("Please define function buildRules() { ... }") }\nreturn buildRules();`,
     ) as (
       createAstRulesBuilderRef: typeof createAstRulesBuilder,
       defineFirestoreRulesLibraryRef: typeof defineFirestoreRulesLibrary,
@@ -59,7 +56,7 @@ function compileRules(source: string): PreviewState {
     }
 
     if (typeof result === "object" && result !== null && "toString" in result) {
-      const sourceOutput = String((result as { toString: () => string }).toString())
+      const sourceOutput = (result as { toString: () => string }).toString()
       return { rules: sourceOutput, error: null }
     }
 
@@ -92,11 +89,15 @@ export function App() {
   useEffect(() => {
     fetch("https://api.npmjs.org/downloads/point/last-month/firestore-rules-dsl")
       .then((r) => r.json())
-      .then((d: { downloads?: number }) => setNpmDownloads(d.downloads ?? null))
+      .then((d: { downloads?: number }) => {
+        setNpmDownloads(d.downloads ?? null)
+      })
       .catch(() => {})
     fetch("https://api.github.com/repos/huafu/firestore-rules-builder")
       .then((r) => r.json())
-      .then((d: { stargazers_count?: number }) => setGithubStars(d.stargazers_count ?? null))
+      .then((d: { stargazers_count?: number }) => {
+        setGithubStars(d.stargazers_count ?? null)
+      })
       .catch(() => {})
   }, [])
 
@@ -223,7 +224,9 @@ export function App() {
               <h2>TypeScript editor</h2>
               <button
                 className="reset-btn"
-                onClick={() => setSource(defaultSource)}
+                onClick={() => {
+                  setSource(defaultSource)
+                }}
                 title="Reset to default example"
               >
                 Reset
@@ -237,7 +240,9 @@ export function App() {
               onMount={handleTsEditorMount}
               language="typescript"
               value={source}
-              onChange={(nextValue) => setSource(nextValue ?? "")}
+              onChange={(nextValue) => {
+                setSource(nextValue ?? "")
+              }}
               theme="dsl-night-sea"
               options={{
                 minimap: { enabled: false },
