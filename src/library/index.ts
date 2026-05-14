@@ -34,6 +34,9 @@ export type FirestoreRulesLibrary<NewLib extends HelperLibrary> = <
  * @returns The same library, preserving exact generic helper typings.
  */
 export function defineFirestoreRulesLibrary<NewLib extends HelperLibrary>(
+  library: FirestoreRulesLibrary<NewLib>,
+): FirestoreRulesLibrary<NewLib>
+export function defineFirestoreRulesLibrary<NewLib extends HelperLibrary>(
   library: (context: AnyContext, register: AnyRegister) => NewLib,
 ): FirestoreRulesLibrary<NewLib> {
   // TS can reject assigning contextually-typed arrow callbacks to higher-rank

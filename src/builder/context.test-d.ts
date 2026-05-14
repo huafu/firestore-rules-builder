@@ -113,16 +113,55 @@ describe("builder context types", () => {
     expectTypeOf<TokenExpr>().not.toHaveProperty("loc")
   })
 
+  it("exposes split on string fields", () => {
+    expectTypeOf<Ctx["resource"]["data"]["name"]>().toHaveProperty("split")
+    expectTypeOf<
+      ReturnType<Ctx["resource"]["data"]["name"]["split"]>
+    >().toExtend<PublicExpression>()
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["name"]["split"]>>().toHaveProperty("size")
+  })
+
+  it("exposes ifElse helper on context", () => {
+    expectTypeOf<Ctx>().toHaveProperty("ifElse")
+    expectTypeOf<ReturnType<Ctx["ifElse"]>>().toExtend<PublicExpression>()
+  })
+
+  it("exposes switchCase and hasPath helpers on context", () => {
+    expectTypeOf<Ctx>().toHaveProperty("switchCase")
+    expectTypeOf<Ctx>().toHaveProperty("hasPath")
+    expectTypeOf<ReturnType<Ctx["switchCase"]>>().toExtend<PublicExpression>()
+    expectTypeOf<ReturnType<Ctx["hasPath"]>>().toExtend<PublicExpression>()
+  })
+
   it("accepts primitive and null values in comparison helpers", () => {
     expectTypeOf<ReturnType<Ctx["request"]["auth"]["neq"]>>().toExtend<PublicExpression>()
     expectTypeOf<ReturnType<Ctx["resource"]["data"]["name"]["eq"]>>().toExtend<PublicExpression>()
     expectTypeOf<ReturnType<Ctx["resource"]["data"]["name"]["gt"]>>().toExtend<PublicExpression>()
 
-    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>().toEqualTypeOf<
-      PublicExpression | string | number | boolean | null
-    >()
-    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>().toEqualTypeOf<
-      PublicExpression | string | number | boolean | null
-    >()
+    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
+      .extract<null>()
+      .toEqualTypeOf<null>()
+    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
+      .extract<string>()
+      .toEqualTypeOf<string>()
+    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
+      .extract<number>()
+      .toEqualTypeOf<number>()
+    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
+      .extract<boolean>()
+      .toEqualTypeOf<boolean>()
+
+    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
+      .extract<null>()
+      .toEqualTypeOf<null>()
+    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
+      .extract<string>()
+      .toEqualTypeOf<string>()
+    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
+      .extract<number>()
+      .toEqualTypeOf<number>()
+    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
+      .extract<boolean>()
+      .toEqualTypeOf<boolean>()
   })
 })

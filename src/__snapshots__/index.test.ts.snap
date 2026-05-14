@@ -4,11 +4,20 @@ exports[`root barrel real-world integration > comprehensive rules using all cont
 "rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function canReadByMethod() {
+      return request.method == 'get' ? true : request.method == 'list' ? true : request.method == 'read' ? true : false;
+    }
     function isOwner(ownerId) {
       return request.auth.uid == ownerId;
     }
     function isSignedIn() {
       return request.auth != null && request.auth.uid != null;
+    }
+    function listRoles() {
+      return request.auth != null && request.auth.token != null && request.auth.token.roles != null ? request.auth.token.roles.split(',') : [];
+    }
+    function hasRoles() {
+      return listRoles().size() > 0;
     }
     function isAdmin() {
       return request.auth.token.admin == true;
@@ -20,8 +29,8 @@ service cloud.firestore {
       return request.time < expiresAt;
     }
     match /users/{userId} {
-      allow read: if isOwner(userId) || isSignedIn();
-      allow create: if isSignedIn() && resource.data.createdAt == request.time;
+      allow read: if canReadByMethod() && (isOwner(userId) || isSignedIn() || hasRoles());
+      allow create: if isSignedIn() && resource.data.createdAt == request.time && resource.data.email.split('@').size() == 2;
       allow update: if isOwner(userId);
       allow delete: if isOwner(userId) || isAdmin();
     }

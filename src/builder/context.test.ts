@@ -118,6 +118,58 @@ describe("createBuilderContext runtime", () => {
     expect((expr as ExpressionNode).kind).toBe("BinaryExpression")
   })
 
+  it("supports split helper on string fields", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.resource.data.email.split(",")
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind")
+    expect((expr as unknown as ExpressionNode).kind).toBe("CallExpression")
+  })
+
+  it("supports ifElse helper for ternary-style expressions", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.ifElse(ctx.request.auth.neq(null), ctx.request.auth.uid, "anonymous")
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind")
+    expect((expr as unknown as ExpressionNode).kind).toBe("ConditionalExpression")
+  })
+
+  it("supports switchCase helper", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.switchCase(
+      ctx.request.method,
+      [
+        ["get", true],
+        ["list", true],
+      ],
+      false,
+    )
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind")
+    expect((expr as unknown as ExpressionNode).kind).toBe("ConditionalExpression")
+  })
+
+  it("supports hasPath helper for safe object-chain checks", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.hasPath(ctx.request, "auth.token.orgId")
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind")
+    expect((expr as unknown as ExpressionNode).kind).toBe("LogicalExpression")
+  })
+
+  it("supports list literal fallback in ifElse", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.ifElse(ctx.request.auth.neq(null), ctx.request.auth.uid.split(","), [])
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind")
+    expect((expr as unknown as ExpressionNode).kind).toBe("ConditionalExpression")
+  })
+
   it("throws for invalid params access", () => {
     const ctx = createBuilderContext<TestDb, "users/{userId}">({
       pathPattern: "users/{userId}",
