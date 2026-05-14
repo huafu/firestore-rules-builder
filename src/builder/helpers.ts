@@ -82,6 +82,9 @@ type HelperBodyFactory<
   args: HelperArgs<Args>,
 ) => ExpressionNode | PublicExpression
 
+type HelperReturnFromFactory<F extends (...args: any[]) => ExpressionNode | PublicExpression> =
+  ReturnType<F> extends RuleValue<infer T> ? RuleValue<T> : RuleValue
+
 /**
  * Context-aware helper registrar exposed to helper library factories.
  */
@@ -89,11 +92,11 @@ export type RegisterContextHelper<
   Db extends DatabaseDefinition<unknown, Record<string, unknown>>,
   AtPath extends string,
   Lib extends Record<string, unknown>,
-> = <const Args extends readonly string[]>(
+> = <const Args extends readonly string[], F extends HelperBodyFactory<Db, AtPath, Lib, Args>>(
   name: string,
   argNames: Args,
-  bodyFactory: HelperBodyFactory<Db, AtPath, Lib, Args>,
-) => (...args: { [Index in keyof Args]: HelperArgument }) => RuleValue
+  bodyFactory: F,
+) => (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
 
 /**
  * Factory contract for extending builder helper libraries.
@@ -317,11 +320,22 @@ export class BuilderHelpersManager<
   /**
    * Registers a single named helper function and returns its callable proxy.
    */
-  protected register<const Args extends readonly string[]>(
+  protected register<
+    const Args extends readonly string[],
+    F extends HelperBodyFactory<Db, AtPath, Lib, Args>,
+  >(
     name: string,
     argNames: Args,
-    bodyFactory: HelperBodyFactory<Db, AtPath, Lib, Args>,
-  ): (...args: { [Index in keyof Args]: HelperArgument }) => RuleValue {
+    bodyFactory: F,
+  ): (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
+  protected register<
+    const Args extends readonly string[],
+    F extends HelperBodyFactory<Db, AtPath, Lib, Args>,
+  >(
+    name: string,
+    argNames: Args,
+    bodyFactory: F,
+  ): (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F> {
     if (ReservedContextKeys.has(name)) {
       throw new Error(`Helper "${name}" cannot overwrite a built-in context property.`)
     }
@@ -358,7 +372,9 @@ export class BuilderHelpersManager<
       dependencies: new Set<string>(),
     })
 
-    return callable
+    return callable as (
+      ...args: { [Index in keyof Args]: HelperArgument }
+    ) => HelperReturnFromFactory<F>
   }
 
   /**

@@ -10,10 +10,14 @@ import {
   identifier,
   memberExpression,
   binaryExpression,
+  conditionalExpression,
   logicalExpression,
   unaryExpression,
   callExpression,
   isExpression,
+  listLiteral,
+  mapEntry,
+  mapLiteral,
   nullLiteral,
   numberLiteral,
   stringLiteral,
@@ -55,6 +59,7 @@ import {
   exists,
   get,
   getAfter,
+  callMethod,
   callHelper,
 } from "../ast/known-factories"
 import type { EmptyObject } from "./utils"
@@ -79,7 +84,49 @@ export type PublicExpression = Omit<ExpressionNode, "kind" | "loc">
 
 /** Internal alias used for concise proxy method signatures. */
 type Expr = PublicExpression
-type RuleValueInput = Expr | string | number | boolean | null
+type RuleValueLiteral =
+  | string
+  | number
+  | boolean
+  | null
+  | RuleValueLiteral[]
+  | { [key: string]: RuleValueLiteral }
+type RuleValueInput = Expr | RuleValueLiteral
+
+type NonFunctionKeys<T> = Extract<
+  {
+    [K in keyof T]-?: T[K] extends (...args: any[]) => any ? never : K
+  }[keyof T],
+  string
+>
+
+type DotPath<T> =
+  T extends Record<string, unknown>
+    ? {
+        [K in NonFunctionKeys<T>]: T[K] extends Record<string, unknown>
+          ? `${K}` | `${K}.${DotPath<T[K]>}`
+          : `${K}`
+      }[NonFunctionKeys<T>]
+    : never
+
+type ValueFromInput<T> = T extends RuleValue<infer U> ? U : T extends RuleValueLiteral ? T : unknown
+
+type ListLikeBranch = {
+  size(): RuleValue<number>
+  hasAll(values: Expr): RuleValue<boolean>
+  hasAny(values: Expr): RuleValue<boolean>
+  hasOnly(values: Expr): RuleValue<boolean>
+}
+
+type IfElseResultValue<C, A> = C extends readonly unknown[]
+  ? C
+  : A extends readonly unknown[]
+    ? A
+    : C extends ListLikeBranch
+      ? unknown[]
+      : A extends ListLikeBranch
+        ? unknown[]
+        : ValueFromInput<C> | ValueFromInput<A>
 
 /** Common comparison/type-check methods available on all proxied values. */
 type CommonValueMethods = {
@@ -193,6 +240,19 @@ type CommonValueMethods = {
   modulo(value: RuleValueInput): Expr
 }
 
+/** String-specific helper methods available on string-like values. */
+type StringMethods = {
+  /**
+   * Splits a string into an array of substrings using the provided separator.
+   * @param separator - The delimiter expression.
+   * @example
+   * ```ts
+   * $.request.auth.token.passportIds.split(",")
+   * ```
+   */
+  split(separator: RuleValueInput): RuleValueProxy<string[]>
+}
+
 /** List-specific helper methods available on array-like values. */
 type ListMethods = {
   /**
@@ -202,7 +262,7 @@ type ListMethods = {
    * $.resource.data.tags.size().lte(10)
    * ```
    */
-  size(): Expr
+  size(): RuleValueProxy<number>
   /**
    * Returns `true` if the list contains all values from the given set.
    * @param values - A set expression to check.
@@ -211,7 +271,7 @@ type ListMethods = {
    * $.resource.data.requiredTags.hasAll($.request.auth.token.userTags)
    * ```
    */
-  hasAll(values: Expr): Expr
+  hasAll(values: Expr): RuleValueProxy<boolean>
   /**
    * Returns `true` if the list contains any of the values from the given set.
    * @param values - A set expression to check.
@@ -220,7 +280,7 @@ type ListMethods = {
    * $.resource.data.collaborators.hasAny($.request.auth.token.userId.toSet())
    * ```
    */
-  hasAny(values: Expr): Expr
+  hasAny(values: Expr): RuleValueProxy<boolean>
   /**
    * Returns `true` if the list contains only and all values from the given set (exact match).
    * @param values - A set expression to check.
@@ -229,7 +289,7 @@ type ListMethods = {
    * $.resource.data.roles.hasOnly(["admin", "editor"])
    * ```
    */
-  hasOnly(values: Expr): Expr
+  hasOnly(values: Expr): RuleValueProxy<boolean>
   /**
    * Returns a string that joins all list elements with the given separator.
    * @param separator - The separator string or expression.
@@ -238,7 +298,7 @@ type ListMethods = {
    * $.resource.data.tags.join(",")
    * ```
    */
-  join(separator: Expr): Expr
+  join(separator: Expr): RuleValueProxy<string>
   /**
    * Returns a new list combining this list with another list.
    * @param values - The list to concatenate.
@@ -247,7 +307,7 @@ type ListMethods = {
    * $.resource.data.existingTags.concat($.request.data.newTags)
    * ```
    */
-  concat(values: Expr): Expr
+  concat(values: Expr): RuleValueProxy<unknown[]>
   /**
    * Returns a new list with all elements from the given set removed.
    * @param values - A set of values to remove.
@@ -256,7 +316,7 @@ type ListMethods = {
    * $.resource.data.roles.removeAll(["guest"])
    * ```
    */
-  removeAll(values: Expr): Expr
+  removeAll(values: Expr): RuleValueProxy<unknown[]>
   /**
    * Returns the list as a set (unique values only).
    * @example
@@ -264,7 +324,7 @@ type ListMethods = {
    * $.resource.data.tags.toSet()
    * ```
    */
-  toSet(): Expr
+  toSet(): RuleValueProxy<unknown[]>
 }
 
 /** Map-specific helper methods available on object/map values. */
@@ -276,7 +336,7 @@ type MapMethods = {
    * $.resource.data.metadata.size().gt(0)
    * ```
    */
-  size(): Expr
+  size(): RuleValueProxy<number>
   /**
    * Returns a list of all keys in the map.
    * @example
@@ -284,7 +344,7 @@ type MapMethods = {
    * $.resource.data.config.keys().hasAny(["enabled", "disabled"])
    * ```
    */
-  keys(): Expr
+  keys(): RuleValueProxy<string[]>
   /**
    * Compares this map with another map and returns a diff object with methods to inspect changes.
    * @param other - The map to compare against.
@@ -306,7 +366,7 @@ type MapDiffProxy = Expr & {
    * $.resource.data.tags.diff($.request.resource.data.tags).addedKeys().size()
    * ```
    */
-  addedKeys(): Expr
+  addedKeys(): RuleValueProxy<string[]>
   /**
    * Returns a set of keys that were affected by any change (added, removed, or modified).
    * @example
@@ -314,7 +374,7 @@ type MapDiffProxy = Expr & {
    * $.resource.data.config.diff($.request.resource.data.config).affectedKeys()
    * ```
    */
-  affectedKeys(): Expr
+  affectedKeys(): RuleValueProxy<string[]>
   /**
    * Returns a set of keys whose values changed between old and new maps.
    * @example
@@ -322,7 +382,7 @@ type MapDiffProxy = Expr & {
    * $.resource.data.metadata.diff($.request.resource.data.metadata).changedKeys().size().gt(0)
    * ```
    */
-  changedKeys(): Expr
+  changedKeys(): RuleValueProxy<string[]>
   /**
    * Returns a set of keys that were removed (present in old map but not in new).
    * @example
@@ -330,7 +390,7 @@ type MapDiffProxy = Expr & {
    * $.resource.data.tags.diff($.request.resource.data.tags).removedKeys()
    * ```
    */
-  removedKeys(): Expr
+  removedKeys(): RuleValueProxy<string[]>
   /**
    * Returns a set of keys that remained unchanged between old and new maps.
    * @example
@@ -338,7 +398,7 @@ type MapDiffProxy = Expr & {
    * $.resource.data.config.diff($.request.resource.data.config).unchangedKeys()
    * ```
    */
-  unchangedKeys(): Expr
+  unchangedKeys(): RuleValueProxy<string[]>
 }
 
 /**
@@ -349,6 +409,7 @@ type MapDiffProxy = Expr & {
  */
 type RuleValueProxy<T> = Expr &
   CommonValueMethods &
+  (T extends string ? StringMethods : EmptyObject) &
   (T extends readonly unknown[] ? ListMethods : EmptyObject) &
   (T extends Record<string, unknown>
     ? MapMethods & { [K in StringKeyOf<T>]: RuleValueProxy<T[K]> }
@@ -490,6 +551,57 @@ type GlobalHelpers = {
    */
   not(condition: Expr): Expr
 
+  /**
+   * Ternary-style conditional expression helper.
+   *
+   * @param test - Condition expression to evaluate.
+   * @param consequent - Returned when `test` is truthy.
+   * @param alternate - Returned when `test` is falsy.
+   * @example
+   * ```ts
+   * $.ifElse($.request.auth.neq(null), $.request.auth.uid, "anonymous")
+   * ```
+   */
+  ifElse<TConsequent, TAlternate>(
+    test: Expr,
+    consequent: TConsequent & RuleValueInput,
+    alternate: TAlternate & RuleValueInput,
+  ): RuleValue<IfElseResultValue<TConsequent, TAlternate>>
+
+  /**
+   * Switch/case style helper built on nested conditional expressions.
+   *
+   * Cases are evaluated in order and the first match wins.
+   *
+   * @param value - The value to compare against each case key.
+   * @param cases - Ordered `[caseValue, result]` pairs.
+   * @param fallback - Result used when no case matches.
+   * @example
+   * ```ts
+   * $.switchCase($.resource.data.plan, [["free", 1], ["pro", 2]], 0)
+   * ```
+   */
+  switchCase<TResult extends RuleValueInput>(
+    value: RuleValueInput,
+    cases: readonly (readonly [RuleValueInput, TResult])[],
+    fallback: TResult,
+  ): RuleValue<ValueFromInput<TResult>>
+
+  /**
+   * Returns `true` when all members in a dotted path are non-null.
+   *
+   * @param root - Root object expression to start from.
+   * @param path - Dotted path string (`"auth.token.roles"`, etc).
+   * @example
+   * ```ts
+   * $.hasPath($.request, "auth.token.roles")
+   * ```
+   */
+  hasPath<TRoot extends Record<string, unknown>>(
+    root: TRoot,
+    path: DotPath<TRoot>,
+  ): RuleValue<boolean>
+
   /** Firestore `duration` built-in helpers for working with timestamp durations. */
   duration: {
     /**
@@ -616,14 +728,21 @@ export interface CreateBuilderContextOptions<
 }
 
 /** Converts primitive/public expression values into expression nodes. */
-function toExpressionNode(
-  value: ExpressionNode | PublicExpression | string | number | boolean | null,
-) {
+function toExpressionNode(value: RuleValueInput): ExpressionNode {
   if (typeof value === "string") return stringLiteral(value)
   if (typeof value === "number") return numberLiteral(value)
   if (typeof value === "boolean") return booleanLiteral(value)
   if (value === null) return nullLiteral()
-  return value as ExpressionNode
+  if (Array.isArray(value)) return listLiteral(value.map((item) => toExpressionNode(item)))
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof value === "object" && value && !("kind" in value)) {
+    return mapLiteral(
+      Object.entries(value).map(([key, entryValue]) =>
+        mapEntry(stringLiteral(key), toExpressionNode(entryValue)),
+      ),
+    )
+  }
+  return value as unknown as ExpressionNode
 }
 
 /** Builds consistent unknown-property error messages for proxy contexts. */
@@ -722,51 +841,64 @@ function createRuleValueProxyHandler(
         return fn
       }
 
+      if (prop === "split") {
+        const fn = (separator: any) =>
+          wrapExpressionInProxy(callMethod(baseExpr, "split", [toExpressionNode(separator)]))
+        cache.set(prop, fn)
+        return fn
+      }
+
       // List methods: size, hasAll, hasAny, hasOnly, join, concat, removeAll, toSet
       if (prop === "size") {
-        const fn = () => sizeOf(baseExpr)
+        const fn = () => wrapExpressionInProxy(sizeOf(baseExpr))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "hasAll") {
-        const fn = (values: any) => hasAll(baseExpr, values)
+        const fn = (values: any) =>
+          wrapExpressionInProxy(hasAll(baseExpr, toExpressionNode(values)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "hasAny") {
-        const fn = (values: any) => hasAny(baseExpr, values)
+        const fn = (values: any) =>
+          wrapExpressionInProxy(hasAny(baseExpr, toExpressionNode(values)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "hasOnly") {
-        const fn = (values: any) => hasOnly(baseExpr, values)
+        const fn = (values: any) =>
+          wrapExpressionInProxy(hasOnly(baseExpr, toExpressionNode(values)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "join") {
-        const fn = (separator: any) => joinList(baseExpr, separator)
+        const fn = (separator: any) =>
+          wrapExpressionInProxy(joinList(baseExpr, toExpressionNode(separator)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "concat") {
-        const fn = (other: any) => concatLists(baseExpr, other)
+        const fn = (other: any) =>
+          wrapExpressionInProxy(concatLists(baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "removeAll") {
-        const fn = (values: any) => removeAll(baseExpr, values)
+        const fn = (values: any) =>
+          wrapExpressionInProxy(removeAll(baseExpr, toExpressionNode(values)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "toSet") {
-        const fn = () => toSet(baseExpr)
+        const fn = () => wrapExpressionInProxy(toSet(baseExpr))
         cache.set(prop, fn)
         return fn
       }
 
       // Map methods: keys, diff
       if (prop === "keys") {
-        const fn = () => keysOf(baseExpr)
+        const fn = () => wrapExpressionInProxy(keysOf(baseExpr))
         cache.set(prop, fn)
         return fn
       }
@@ -776,11 +908,16 @@ function createRuleValueProxyHandler(
           return new Proxy(diffResult, {
             get(_, methodProp: string | symbol) {
               if (typeof methodProp !== "string") return undefined
-              if (methodProp === "addedKeys") return () => addedKeys(diffResult)
-              if (methodProp === "removedKeys") return () => removedKeys(diffResult)
-              if (methodProp === "changedKeys") return () => changedKeys(diffResult)
-              if (methodProp === "affectedKeys") return () => affectedKeys(diffResult)
-              if (methodProp === "unchangedKeys") return () => unchangedKeys(diffResult)
+              if (methodProp === "addedKeys")
+                return () => wrapExpressionInProxy(addedKeys(diffResult))
+              if (methodProp === "removedKeys")
+                return () => wrapExpressionInProxy(removedKeys(diffResult))
+              if (methodProp === "changedKeys")
+                return () => wrapExpressionInProxy(changedKeys(diffResult))
+              if (methodProp === "affectedKeys")
+                return () => wrapExpressionInProxy(affectedKeys(diffResult))
+              if (methodProp === "unchangedKeys")
+                return () => wrapExpressionInProxy(unchangedKeys(diffResult))
               throw unknownPropertyError("diff", methodProp, [
                 "addedKeys",
                 "removedKeys",
@@ -1177,6 +1314,72 @@ export function createBuilderContext<
       ),
     not: (condition: any) =>
       wrapExpressionInProxy(unaryExpression("!", toExpressionNode(condition))),
+    ifElse: (test: any, consequent: any, alternate: any) =>
+      wrapExpressionInProxy(
+        conditionalExpression(
+          toExpressionNode(test),
+          toExpressionNode(consequent),
+          toExpressionNode(alternate),
+        ),
+      ),
+    switchCase: (value: any, cases: readonly (readonly [any, any])[], fallback: any) => {
+      const valueExpr = toExpressionNode(value)
+      const folded = [...cases].reverse().reduce((acc, [caseValue, result]) => {
+        return conditionalExpression(
+          binaryExpression("==", valueExpr, toExpressionNode(caseValue)),
+          toExpressionNode(result),
+          acc,
+        )
+      }, toExpressionNode(fallback))
+      return wrapExpressionInProxy(folded)
+    },
+    hasPath: (root: any, path: string) => {
+      const flatSegments = path.split(".").filter(Boolean)
+      if (flatSegments.length === 0) {
+        throw new Error("hasPath requires a non-empty dotted path.")
+      }
+
+      let currentExpr: ExpressionNode
+      let startIndex = 0
+
+      const looksLikeRequestRoot =
+        typeof root === "object" &&
+        root !== null &&
+        ["auth", "method", "path", "query", "resource", "time"].every((key) => key in root)
+      const looksLikeResourceRoot =
+        typeof root === "object" && root !== null && ["id", "data"].every((key) => key in root)
+
+      if (looksLikeRequestRoot) {
+        currentExpr = identifier("request")
+      } else if (looksLikeResourceRoot) {
+        currentExpr = identifier("resource")
+      } else if (typeof root === "object" && root && !("kind" in root)) {
+        const firstSegment = flatSegments[0]
+        if (!firstSegment) {
+          throw new Error("hasPath requires a non-empty dotted path.")
+        }
+
+        currentExpr = toExpressionNode(
+          (root as Record<string, unknown>)[firstSegment] as RuleValueInput,
+        )
+        startIndex = 1
+      } else {
+        currentExpr = toExpressionNode(root)
+      }
+
+      let chainValid: ExpressionNode | undefined =
+        looksLikeRequestRoot || looksLikeResourceRoot
+          ? undefined
+          : binaryExpression("!=", currentExpr, nullLiteral())
+
+      for (const segment of flatSegments.slice(startIndex)) {
+        currentExpr = memberExpression(currentExpr, identifier(segment))
+        const memberCheck = binaryExpression("!=", currentExpr, nullLiteral())
+        chainValid = chainValid ? logicalExpression("&&", chainValid, memberCheck) : memberCheck
+      }
+
+      return wrapExpressionInProxy(chainValid ?? booleanLiteral(true))
+    },
     op: (left: any, operator: BinaryOperator, right: any) =>
       wrapExpressionInProxy(
         binaryExpression(operator, toExpressionNode(left), toExpressionNode(right)),

@@ -44,7 +44,7 @@ describe("root barrel real-world integration", () => {
     type AppClaims = {
       admin: boolean
       orgId: string
-      userId: string
+      roles: string
     }
 
     type AppDb = DatabaseDefinition<
@@ -83,17 +83,48 @@ describe("root barrel real-world integration", () => {
         const notExpired = register("notExpired", ["expiresAt"], (_helperCtx, { expiresAt }) => {
           return ctx.request.time.lt(expiresAt)
         })
-        return { isAdmin, isMemberOfOrg, notExpired }
+        const listRoles = register("listRoles", [], () => {
+          return ctx.ifElse(
+            ctx.hasPath(ctx.request, "auth.token.roles"),
+            ctx.request.auth.token.roles.split(","),
+            [],
+          )
+        })
+        const hasRoles = register("hasRoles", [], () => {
+          return listRoles().size().gt(0)
+        })
+        const canReadByMethod = register("canReadByMethod", [], () => {
+          return ctx.switchCase(
+            ctx.request.method,
+            [
+              ["get", true],
+              ["list", true],
+              ["read", true],
+            ],
+            false,
+          )
+        })
+        return { isAdmin, isMemberOfOrg, notExpired, listRoles, hasRoles, canReadByMethod }
       })
 
     builder.matches((match) => {
       // User documents: use $.request, $.resource, $.params, $.exists, $.get, arithmetic
       match("users/{userId}", (users, $) => {
-        users.allow("read", $.or($.isOwner($.params.userId), $.isSignedIn()))
+        users.allow(
+          "read",
+          $.and(
+            $.canReadByMethod(),
+            $.or($.isOwner($.params.userId), $.isSignedIn(), $.hasRoles()),
+          ),
+        )
 
         users.allow(
           "create",
-          $.and($.isSignedIn(), $.request.resource.data.createdAt.eq($.request.time)),
+          $.and(
+            $.isSignedIn(),
+            $.request.resource.data.createdAt.eq($.request.time),
+            $.request.resource.data.email.split("@").size().eq(2),
+          ),
         )
 
         users.allow("update", $.isOwner($.params.userId))
