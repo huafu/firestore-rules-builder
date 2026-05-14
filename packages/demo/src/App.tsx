@@ -13,7 +13,10 @@ type PreviewState = {
 }
 
 function normalizeSourceForExecution(source: string): string {
-  return source.replace(/^\s*import\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm, "")
+  return source.replace(
+    /^\s*import(?:\s+type)?\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm,
+    "",
+  )
 }
 
 function compileRules(source: string): PreviewState {
@@ -79,6 +82,7 @@ function formatCount(n: number): string {
 }
 
 export function App() {
+  const dslVersion = __DSL_VERSION__
   const [source, setSource] = useState(defaultSource)
   const [preview, setPreview] = useState<PreviewState>(() => compileRules(defaultSource))
   const [npmDownloads, setNpmDownloads] = useState<number | null>(null)
@@ -156,6 +160,9 @@ export function App() {
           </div>
         </div>
         <div className="header-actions">
+          <span className="version-pill" title="Current package version">
+            v{dslVersion}
+          </span>
           <a
             href="https://www.npmjs.com/package/firestore-rules-dsl"
             target="_blank"
