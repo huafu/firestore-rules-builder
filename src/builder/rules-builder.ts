@@ -170,6 +170,10 @@ export class FirestoreAstRulesBuilder<
     this.fullPath = fullPath
     this.options = options
     this.helperManager = helperManager ?? new BuilderHelpersManager<Db, AtPath>()
+
+    // Allow destructuring methods like `const { allow } = users` in match callbacks.
+    this.allow = this.allow.bind(this)
+    this.matches = this.matches.bind(this)
   }
 
   /**

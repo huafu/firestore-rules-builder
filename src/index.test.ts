@@ -6,8 +6,60 @@ import {
   type CollectionShape,
   type DatabaseDefinition,
 } from "./index"
+import ts from "typescript"
+import { readFileSync } from "node:fs"
+import path from "node:path"
+
+function loadDemoDefaultSource(): string {
+  const demoSourcePath = path.resolve(process.cwd(), "packages/demo/src/defaultSource.ts")
+  const fileContent = readFileSync(demoSourcePath, "utf8")
+  const match = fileContent.match(/export const defaultSource = `([\s\S]*)`\s*$/)
+
+  if (!match || !match[1]) {
+    throw new Error("Unable to parse defaultSource from packages/demo/src/defaultSource.ts")
+  }
+
+  return match[1]
+}
 
 describe("root barrel real-world integration", () => {
+  it("renders rules from the playground default source", () => {
+    const defaultSource = loadDemoDefaultSource()
+    const sourceForExecution = defaultSource.replace(
+      /^\s*import\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm,
+      "",
+    )
+
+    const transpiled = ts.transpileModule(sourceForExecution, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ESNext,
+        ignoreDeprecations: "6.0",
+        strict: true,
+      },
+      reportDiagnostics: true,
+    })
+
+    expect(transpiled.diagnostics?.length ?? 0).toBe(0)
+
+    // Required to execute the imported playground source in test runtime.
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const runBuildRules = new Function(
+      "createAstRulesBuilder",
+      "defineFirestoreRulesLibrary",
+      `${transpiled.outputText}\nif (typeof buildRules !== "function") { throw new Error("Please define function buildRules() { ... }") }\nreturn buildRules();`,
+    ) as (
+      createAstRulesBuilderRef: typeof createAstRulesBuilder,
+      defineFirestoreRulesLibraryRef: typeof defineFirestoreRulesLibrary,
+    ) => unknown
+
+    const result = runBuildRules(createAstRulesBuilder, defineFirestoreRulesLibrary)
+    const renderedSource =
+      typeof result === "string" ? result : (result as { toString: () => string }).toString()
+
+    expect(renderedSource).toMatchSnapshot()
+  })
+
   it("comprehensive rules using all context helpers and methods", () => {
     type UserDoc = {
       displayName: string

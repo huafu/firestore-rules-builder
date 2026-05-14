@@ -27,7 +27,7 @@ const buildRules = () => createAstRulesBuilder<AppDb>()
     ),
   }))
   .matches((match) => {
-    match("users/{userId}", ({allow}, $) => {
+    match("users/{userId}", ({ allow }, $) => {
       allow(
         "read",
         $.and(
