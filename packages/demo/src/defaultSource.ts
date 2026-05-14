@@ -1,4 +1,5 @@
-export const defaultSource = `import { createAstRulesBuilder, defineFirestoreRulesLibrary, DatabaseDefinition, CollectionShape } from "firestore-rules-dsl"
+export const defaultSource = `import { createAstRulesBuilder } from "firestore-rules-dsl"
+import type { DatabaseDefinition, CollectionShape } from "firestore-rules-dsl"
 
 type UserDoc = {
   name: string

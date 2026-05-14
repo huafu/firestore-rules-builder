@@ -26,7 +26,7 @@ describe("root barrel real-world integration", () => {
   it("renders rules from the playground default source", () => {
     const defaultSource = loadDemoDefaultSource()
     const sourceForExecution = defaultSource.replace(
-      /^\s*import\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm,
+      /^\s*import(?:\s+type)?\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm,
       "",
     )
 
