@@ -73,7 +73,7 @@
     "dev": "vite build --watch",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:tarball-integration": "tsx scripts/test-tarball-integration.ts",
+    "check:exports": "tsx scripts/check-package-exports.ts",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.eslint.json --noEmit"
   },
