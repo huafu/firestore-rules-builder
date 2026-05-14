@@ -25,13 +25,13 @@ describe("builder helper manager types", () => {
   it("merges helper functions into the builder context", () => {
     const manager = new BuilderHelpersManager<Db, "users/{userId}">().withHelpers(
       (ctx, register) => {
-        const isOwner = register("isOwner", ["ownerId"], (_innerCtx, { ownerId }) =>
+        const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
           ctx.request.auth.uid.eq(ownerId),
         )
 
         return {
           isOwner,
-          canRead: register("canRead", ["ownerId"], (_innerCtx, { ownerId }) => isOwner(ownerId)),
+          canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
         }
       },
     )

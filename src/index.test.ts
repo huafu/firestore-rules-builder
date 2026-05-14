@@ -65,7 +65,7 @@ describe("root barrel real-world integration", () => {
       const isSignedIn = register("isSignedIn", [], () =>
         ctx.and(ctx.request.auth.neq(null), ctx.request.auth.uid.neq(null)),
       )
-      const isOwner = register("isOwner", ["ownerId"], (_helperCtx, { ownerId }) => {
+      const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) => {
         return ctx.request.auth.uid.eq(ownerId)
       })
       return { isSignedIn, isOwner }
@@ -77,10 +77,10 @@ describe("root barrel real-world integration", () => {
         const isAdmin = register("isAdmin", [], () => {
           return ctx.request.auth.token.admin.eq(true)
         })
-        const isMemberOfOrg = register("isMemberOfOrg", ["orgId"], (_helperCtx, { orgId }) => {
+        const isMemberOfOrg = register("isMemberOfOrg", ["orgId"], ({ orgId }) => {
           return ctx.request.auth.token.orgId.eq(orgId)
         })
-        const notExpired = register("notExpired", ["expiresAt"], (_helperCtx, { expiresAt }) => {
+        const notExpired = register("notExpired", ["expiresAt"], ({ expiresAt }) => {
           return ctx.request.time.lt(expiresAt)
         })
         const listRoles = register("listRoles", [], () => {

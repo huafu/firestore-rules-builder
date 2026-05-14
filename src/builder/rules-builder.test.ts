@@ -60,13 +60,13 @@ describe("ast rules builder", () => {
 
   it("emits only used helpers and their dependencies", () => {
     const builder = createAstRulesBuilder<TestDb>().withHelpers((ctx, register) => {
-      const isOwner = register("isOwner", ["ownerId"], (_helperCtx, { ownerId }) =>
+      const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
         ctx.request.auth.uid.eq(ownerId),
       )
 
       return {
         isOwner,
-        canRead: register("canRead", ["ownerId"], (_helperCtx, { ownerId }) => isOwner(ownerId)),
+        canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
         neverUsed: register("neverUsed", [], () => ctx.request.auth.token.admin),
       }
     })
@@ -150,7 +150,7 @@ describe("ast rules builder", () => {
       const recursive: (ownerId: RuleValue) => RuleValue = register(
         "recursive",
         ["ownerId"],
-        (_helperCtx, { ownerId }) => recursive(ownerId),
+        ({ ownerId }) => recursive(ownerId),
       )
 
       return { recursive }

@@ -83,13 +83,13 @@ describe("testing harness", () => {
   it("returns helper declarations emitted by used helper calls", () => {
     const harness = createRulesTestHarness<TestDb>((builder) => {
       const withHelpers = builder.withHelpers((ctx, register) => {
-        const isOwner = register("isOwner", ["ownerId"], (_helperCtx, { ownerId }) => {
+        const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) => {
           return ctx.request.auth.uid.eq(ownerId)
         })
 
         return {
           isOwner,
-          canRead: register("canRead", ["ownerId"], (_helperCtx, { ownerId }) => isOwner(ownerId)),
+          canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
         }
       })
 

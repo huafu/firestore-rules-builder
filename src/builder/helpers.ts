@@ -69,16 +69,13 @@ type HelperArgs<Args extends readonly string[]> = {
   [K in Args[number]]: RuleValue
 }
 
+/** Body factory for helpers that do not take arguments. */
+type ZeroArgHelperBodyFactory = () => ExpressionNode | PublicExpression
+
 /**
  * Signature for a helper body factory used in `register(...)`.
  */
-type HelperBodyFactory<
-  Db extends DatabaseDefinition<unknown, Record<string, unknown>>,
-  AtPath extends string,
-  Lib extends HelperLibrary,
-  Args extends readonly string[],
-> = (
-  context: BuilderContext<Db, AtPath, Lib>,
+type HelperBodyFactory<Args extends readonly string[]> = (
   args: HelperArgs<Args>,
 ) => ExpressionNode | PublicExpression
 
@@ -88,15 +85,19 @@ type HelperReturnFromFactory<F extends (...args: any[]) => ExpressionNode | Publ
 /**
  * Context-aware helper registrar exposed to helper library factories.
  */
-export type RegisterContextHelper<
-  Db extends DatabaseDefinition<unknown, Record<string, unknown>>,
-  AtPath extends string,
-  Lib extends Record<string, unknown>,
-> = <const Args extends readonly string[], F extends HelperBodyFactory<Db, AtPath, Lib, Args>>(
+export type RegisterContextHelper = <
+  const Args extends readonly string[],
+  F extends HelperBodyFactory<Args>,
+>(
   name: string,
   argNames: Args,
   bodyFactory: F,
 ) => (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
+
+export type ZeroArgRegisterContextHelper = <F extends ZeroArgHelperBodyFactory>(
+  name: string,
+  bodyFactory: F,
+) => () => HelperReturnFromFactory<F>
 
 /**
  * Factory contract for extending builder helper libraries.
@@ -109,10 +110,7 @@ export type BuilderHelpersFactory<
   Db extends DatabaseDefinition<unknown, Record<string, unknown>>,
   AtPath extends string,
   Lib extends Record<string, unknown>,
-> = (
-  context: BuilderContext<Db, AtPath, Lib>,
-  register: RegisterContextHelper<Db, AtPath, Lib>,
-) => NewLib
+> = (context: BuilderContext<Db, AtPath, Lib>, register: RegisterContextHelper) => NewLib
 
 function isHelperNamespace(value: unknown): value is HelperLibrary {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -142,18 +140,12 @@ function mergeHelperLibraries(target: Record<string, unknown>, source: HelperLib
 /**
  * Internal representation of a registered helper.
  */
-interface HelperDefinition<
-  Db extends DatabaseDefinition<unknown, Record<string, unknown>>,
-  AtPath extends string,
-> {
+interface HelperDefinition {
   name: string
   argNames: string[]
   callable: (...args: readonly HelperArgument[]) => RuleValue
   dependencies: Set<string>
-  bodyFactory: (
-    context: BuilderContext<Db, AtPath, HelperLibrary>,
-    args: HelperArgs<readonly string[]>,
-  ) => ExpressionNode | PublicExpression
+  bodyFactory: (args: HelperArgs<readonly string[]>) => ExpressionNode | PublicExpression
   cachedBody?: ExpressionNode
 }
 
@@ -195,7 +187,7 @@ export class BuilderHelpersManager<
   AtPath extends string,
   Lib extends Record<string, unknown> = EmptyObject,
 > {
-  protected readonly definitions = new Map<string, HelperDefinition<Db, AtPath>>()
+  protected readonly definitions = new Map<string, HelperDefinition>()
   protected readonly usedHelpers = new Set<string>()
   protected readonly resolutionStack: string[] = []
   protected readonly library: Record<string, unknown> = {}
@@ -320,27 +312,61 @@ export class BuilderHelpersManager<
   /**
    * Registers a single named helper function and returns its callable proxy.
    */
-  protected register<
-    const Args extends readonly string[],
-    F extends HelperBodyFactory<Db, AtPath, Lib, Args>,
-  >(
+  protected register<const Args extends readonly string[], F extends HelperBodyFactory<Args>>(
     name: string,
     argNames: Args,
     bodyFactory: F,
   ): (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
-  protected register<
-    const Args extends readonly string[],
-    F extends HelperBodyFactory<Db, AtPath, Lib, Args>,
-  >(
+  protected register<F extends ZeroArgHelperBodyFactory>(
     name: string,
-    argNames: Args,
     bodyFactory: F,
+  ): () => HelperReturnFromFactory<F>
+  protected register<const Args extends readonly string[], F extends HelperBodyFactory<Args>>(
+    name: string,
+    argNamesOrBodyFactory: Args | ZeroArgHelperBodyFactory,
+    bodyFactory?: F,
   ): (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F> {
     if (ReservedContextKeys.has(name)) {
       throw new Error(`Helper "${name}" cannot overwrite a built-in context property.`)
     }
     if (this.definitions.has(name)) {
       throw new Error(`Helper "${name}" is already registered.`)
+    }
+
+    if (typeof argNamesOrBodyFactory === "function") {
+      const bodyFactoryOnly = argNamesOrBodyFactory
+
+      const callable = (): RuleValue => {
+        if (this.resolutionStack.includes(name)) {
+          throw new Error(`Recursive helper call detected for "${name}".`)
+        }
+
+        const currentHelper = this.resolutionStack[this.resolutionStack.length - 1]
+        if (currentHelper) {
+          this.definitions.get(currentHelper)?.dependencies.add(name)
+        }
+
+        this.usedHelpers.add(name)
+        return proxyRuleValue(callHelper(name, []))
+      }
+
+      this.definitions.set(name, {
+        name,
+        argNames: [],
+        callable,
+        bodyFactory: () => bodyFactoryOnly(),
+        dependencies: new Set<string>(),
+      })
+
+      return callable as (
+        ...args: { [Index in keyof Args]: HelperArgument }
+      ) => HelperReturnFromFactory<F>
+    }
+
+    const argNames = argNamesOrBodyFactory
+
+    if (!bodyFactory) {
+      throw new Error(`Helper body factory is required for "${name}".`)
     }
 
     const callable = (...args: { [Index in keyof Args]: HelperArgument }) => {
@@ -368,7 +394,7 @@ export class BuilderHelpersManager<
       name,
       argNames: [...argNames],
       callable: callable as (...args: readonly HelperArgument[]) => RuleValue,
-      bodyFactory: bodyFactory as HelperDefinition<Db, AtPath>["bodyFactory"],
+      bodyFactory: (helperArgs: HelperArgs<Args>) => bodyFactory(helperArgs),
       dependencies: new Set<string>(),
     })
 
@@ -402,7 +428,7 @@ export class BuilderHelpersManager<
         definition.argNames.map((argName) => [argName, proxyRuleValue(identifier(argName))]),
       )
 
-      const body = toExpressionNode(definition.bodyFactory(this.contextProxy, args))
+      const body = toExpressionNode(definition.bodyFactory(args))
 
       definition.cachedBody = body
       return body

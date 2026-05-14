@@ -16,42 +16,29 @@ type AppDb = DatabaseDefinition<{
   AppClaims
 >
 
-function buildRules() {
-  const authHelpers = defineFirestoreRulesLibrary(($, register) => {
-    const isSignedIn = register("isSignedIn", [], ($) => {
-      return $.request.auth.neq(null)
-    })
-
-    const isOwner = register("isOwner", ["ownerId"], ($, { ownerId }) => {
-      return $.request.auth.uid.eq(ownerId)
-    })
-
-    return { isSignedIn, isOwner }
-  })
-
-  const builder = createAstRulesBuilder<AppDb>()
-    .withHelpers(authHelpers)
-    .withHelpers(($, register) => {
-      const isAdmin = register("isAdmin", [], ($) => $.and(
-        $.hasPath($.request, "auth.token"),
+const buildRules = () => createAstRulesBuilder<AppDb>()
+  .withHelpers(($, register) => ({
+    isSignedIn: register(
+      "isSignedIn", [],
+      () => $.and(
+        $.request.auth.neq(null),
+        $.request.auth.uid.neq(null),
+      )
+    ),
+  }))
+  .matches((match) => {
+    match("users/{userId}", ({allow}, $) => {
+      allow(
+        "read",
+        $.and(
+          $.isSignedIn(),
+          $.request.auth.uid.eq($.params.userId),
+        )
+      )
+      allow(
+        ["create", "update", "delete"],
         $.request.auth.token.admin.eq(true),
-      ))
-      const canRead = register("canRead", ["ownerId"], ($, arg) => $.or(
-        isAdmin(),
-        $.isOwner(arg.ownerId)
-      ))
-
-      return { isAdmin, canRead }
-    })
-
-  builder.matches((match) => {
-    match("users/{userId}", (users, $) => {
-      users.allow(["get", "list"], $.and($.isSignedIn(), $.canRead($.params.userId)))
-      users.allow("create", $.and($.isSignedIn(), $.request.resource.data.email.split("@").size().eq(2)))
-      users.allow("update", $.isOwner($.resource.id))
+      )
     })
   })
-
-  return builder
-}
 `
