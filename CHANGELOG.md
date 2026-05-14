@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/huafu/firestore-rules-dsl/compare/v1.1.1...v1.2.0) (2026-05-14)
+
+
+### Features
+
+* ✨ add zero-arg register shorthand ([#28](https://github.com/huafu/firestore-rules-dsl/issues/28)) ([cbb5e27](https://github.com/huafu/firestore-rules-dsl/commit/cbb5e27222e8a1820c05d713befbb69ea55802ca))
+* add interactive playground demo sub-package ([#27](https://github.com/huafu/firestore-rules-dsl/issues/27)) ([bb06565](https://github.com/huafu/firestore-rules-dsl/commit/bb06565a6fb71fae8cd67a9288efaacfe0c2ad63))
+
+
+### Bug Fixes
+
+* 🐛 improve context helper typing and hasPath path inference ([#25](https://github.com/huafu/firestore-rules-dsl/issues/25)) ([0f4c03a](https://github.com/huafu/firestore-rules-dsl/commit/0f4c03ae86655af46320cbf61da324770d093d22))
+
 ## [1.1.1](https://github.com/huafu/firestore-rules-dsl/compare/v1.1.0...v1.1.1) (2026-05-13)
 
 
