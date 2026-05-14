@@ -20,6 +20,27 @@ type TestDb = DatabaseDefinition<
 >
 
 describe("builder helpers manager", () => {
+  it("supports zero-argument helper shorthand", () => {
+    const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
+      (ctx, register) => ({
+        isSignedIn: register("isSignedIn", () => ctx.request.auth.uid.is("string")),
+      }),
+    )
+
+    const ctx = createBuilderContext<
+      TestDb,
+      "users/{userId}",
+      {
+        isSignedIn(): RuleValue
+      }
+    >({
+      customClaims: { admin: false, orgId: "" },
+      helperManager: manager,
+    })
+
+    expect(printNode(ctx.isSignedIn() as unknown as ExpressionNode)).toBe("isSignedIn()")
+  })
+
   it("exposes registered helpers on the context", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
       (ctx, register) => ({

@@ -82,22 +82,17 @@ type HelperBodyFactory<Args extends readonly string[]> = (
 type HelperReturnFromFactory<F extends (...args: any[]) => ExpressionNode | PublicExpression> =
   ReturnType<F> extends RuleValue<infer T> ? RuleValue<T> : RuleValue
 
-/**
- * Context-aware helper registrar exposed to helper library factories.
- */
-export type RegisterContextHelper = <
-  const Args extends readonly string[],
-  F extends HelperBodyFactory<Args>,
->(
-  name: string,
-  argNames: Args,
-  bodyFactory: F,
-) => (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
-
-export type ZeroArgRegisterContextHelper = <F extends ZeroArgHelperBodyFactory>(
-  name: string,
-  bodyFactory: F,
-) => () => HelperReturnFromFactory<F>
+export type RegisterContextHelper = {
+  <F extends ZeroArgHelperBodyFactory>(
+    name: string,
+    bodyFactory: F,
+  ): () => HelperReturnFromFactory<F>
+  <const Args extends readonly string[], F extends HelperBodyFactory<Args>>(
+    name: string,
+    argNames: Args,
+    bodyFactory: F,
+  ): (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
+}
 
 /**
  * Factory contract for extending builder helper libraries.

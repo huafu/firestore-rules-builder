@@ -19,7 +19,7 @@ type AppDb = DatabaseDefinition<{
 const buildRules = () => createAstRulesBuilder<AppDb>()
   .withHelpers(($, register) => ({
     isSignedIn: register(
-      "isSignedIn", [],
+      "isSignedIn",
       () => $.and(
         $.request.auth.neq(null),
         $.request.auth.uid.neq(null),
