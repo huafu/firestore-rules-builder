@@ -59,13 +59,13 @@ describe("ast rules builder types", () => {
 
   it("merges helpers into context", () => {
     const builder = createAstRulesBuilder<Db>().withHelpers((ctx, register) => {
-      const isOwner = register("isOwner", ["ownerId"], (_helperCtx, { ownerId }) =>
+      const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
         ctx.request.auth.uid.eq(ownerId),
       )
 
       return {
         isOwner,
-        canRead: register("canRead", ["ownerId"], (_helperCtx, { ownerId }) => isOwner(ownerId)),
+        canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
       }
     })
 
@@ -82,7 +82,7 @@ describe("ast rules builder types", () => {
 
   it("infers nested match types from path argument without explicit generics", () => {
     const builder = createAstRulesBuilder<Db>().withHelpers((ctx, register) => {
-      const canReadOrg = register("canReadOrg", ["orgId"], (_helperCtx, { orgId }) => {
+      const canReadOrg = register("canReadOrg", ["orgId"], ({ orgId }) => {
         return ctx.request.auth.token.orgId.eq(orgId)
       })
       return { canReadOrg }

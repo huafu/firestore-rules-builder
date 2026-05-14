@@ -4,7 +4,7 @@ import type { HelperLibrary, RegisterContextHelper } from "../builder/helpers"
 
 type AnyDatabaseDefinition = DatabaseDefinition<unknown, Record<string, unknown>>
 type AnyContext = BuilderContext<AnyDatabaseDefinition, string, HelperLibrary>
-type AnyRegister = RegisterContextHelper<AnyDatabaseDefinition, string, HelperLibrary>
+type AnyRegister = RegisterContextHelper
 
 /**
  * Reusable helper library contract that stays generic over database/path scope.
@@ -20,7 +20,7 @@ export type FirestoreRulesLibrary<NewLib extends HelperLibrary> = <
   Lib extends HelperLibrary,
 >(
   context: BuilderContext<Db, AtPath, Lib>,
-  register: RegisterContextHelper<Db, AtPath, Lib>,
+  register: RegisterContextHelper,
 ) => NewLib
 
 /**

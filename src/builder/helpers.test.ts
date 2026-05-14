@@ -20,10 +20,31 @@ type TestDb = DatabaseDefinition<
 >
 
 describe("builder helpers manager", () => {
+  it("supports zero-argument helper shorthand", () => {
+    const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
+      (ctx, register) => ({
+        isSignedIn: register("isSignedIn", () => ctx.request.auth.uid.is("string")),
+      }),
+    )
+
+    const ctx = createBuilderContext<
+      TestDb,
+      "users/{userId}",
+      {
+        isSignedIn(): RuleValue
+      }
+    >({
+      customClaims: { admin: false, orgId: "" },
+      helperManager: manager,
+    })
+
+    expect(printNode(ctx.isSignedIn() as unknown as ExpressionNode)).toBe("isSignedIn()")
+  })
+
   it("exposes registered helpers on the context", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
       (ctx, register) => ({
-        isOrgMember: register("isOrgMember", ["orgId"], (_innerCtx, { orgId }) =>
+        isOrgMember: register("isOrgMember", ["orgId"], ({ orgId }) =>
           ctx.request.auth.token.orgId.eq(orgId),
         ),
       }),
@@ -48,13 +69,13 @@ describe("builder helpers manager", () => {
   it("emits only used helpers and their transitive dependencies", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
       (ctx, register) => {
-        const isOwner = register("isOwner", ["ownerId"], (_innerCtx, { ownerId }) =>
+        const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
           ctx.request.auth.uid.eq(ownerId),
         )
 
         return {
           isOwner,
-          canRead: register("canRead", ["ownerId"], (_innerCtx, { ownerId }) => isOwner(ownerId)),
+          canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
           unusedHelper: register("unusedHelper", [], () => ctx.request.auth.token.admin),
         }
       },
@@ -88,7 +109,7 @@ describe("builder helpers manager", () => {
         const recursive: (ownerId: RuleValue) => RuleValue = register(
           "recursive",
           ["ownerId"],
-          (_innerCtx, { ownerId }) => recursive(ownerId),
+          ({ ownerId }) => recursive(ownerId),
         )
 
         return { recursive }

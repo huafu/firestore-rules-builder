@@ -22,16 +22,41 @@ type HelperLib = {
 }
 
 describe("builder helper manager types", () => {
+  it("supports zero-argument helper shorthand", () => {
+    const manager = new BuilderHelpersManager<Db, "users/{userId}">().withHelpers(
+      (ctx, register) => {
+        const isSignedIn = register("isSignedIn", () => ctx.request.auth.uid.is("string"))
+
+        // @ts-expect-error helper bodies no longer receive the context as the first argument
+        register("legacy", (_helperCtx) => {
+          void _helperCtx
+          return ctx.request.auth.uid.is("string")
+        })
+
+        return {
+          isSignedIn,
+        }
+      },
+    )
+
+    const ctx = createBuilderContext<Db, "users/{userId}", { isSignedIn(): RuleValue }>({
+      customClaims: { admin: false, orgId: "" },
+      helperManager: manager,
+    })
+
+    expectTypeOf(ctx.isSignedIn()).toHaveProperty("eq")
+  })
+
   it("merges helper functions into the builder context", () => {
     const manager = new BuilderHelpersManager<Db, "users/{userId}">().withHelpers(
       (ctx, register) => {
-        const isOwner = register("isOwner", ["ownerId"], (_innerCtx, { ownerId }) =>
+        const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
           ctx.request.auth.uid.eq(ownerId),
         )
 
         return {
           isOwner,
-          canRead: register("canRead", ["ownerId"], (_innerCtx, { ownerId }) => isOwner(ownerId)),
+          canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
         }
       },
     )
