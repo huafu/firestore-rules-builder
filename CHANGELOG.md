@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/huafu/firestore-rules-dsl/compare/v1.2.0...v1.3.0) (2026-05-15)
+
+
+### Features
+
+* ✨ type-safe lets inference, subcollection type fixes, and path param validation ([#32](https://github.com/huafu/firestore-rules-dsl/issues/32)) ([e254275](https://github.com/huafu/firestore-rules-dsl/commit/e254275984736c2cf5a60c6e7923f0ee15931c69))
+
+
+### Bug Fixes
+
+* 🐛 improve playground version display and source sanitizing ([#31](https://github.com/huafu/firestore-rules-dsl/issues/31)) ([7644eb8](https://github.com/huafu/firestore-rules-dsl/commit/7644eb858529ad1999bdef964835e85203db3a71))
+* 🐛 support destructured builder methods in playground flow ([#29](https://github.com/huafu/firestore-rules-dsl/issues/29)) ([69cfef1](https://github.com/huafu/firestore-rules-dsl/commit/69cfef1ae07e1cc9364da65cbec0b8f618d74c92))
+
 ## [1.2.0](https://github.com/huafu/firestore-rules-dsl/compare/v1.1.1...v1.2.0) (2026-05-14)
 
 
