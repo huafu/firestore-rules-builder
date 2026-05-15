@@ -164,4 +164,23 @@ describe("ast rules builder", () => {
 
     expect(() => builder.toString()).toThrow('Recursive helper call detected for "recursive".')
   })
+
+  it("rejects duplicate param names between nested match paths", () => {
+    const builder = createAstRulesBuilder<TestDb>()
+
+    builder.matches((match) => {
+      match("users/{userId}", (users) => {
+        users.allow("read", true)
+        users.matches((match) => {
+          match("posts/{userId}", (posts) => {
+            posts.allow("get", true)
+          })
+        })
+      })
+    })
+
+    expect(() => builder.toString()).toThrow(
+      'Path parameter "{userId}" at "users/{userId}/posts/{userId}" shadows an ancestor parameter with the same name. Use a unique parameter name.',
+    )
+  })
 })

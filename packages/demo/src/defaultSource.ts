@@ -1,18 +1,24 @@
 export const defaultSource = `import { createAstRulesBuilder } from "firestore-rules-dsl"
 import type { DatabaseDefinition, CollectionShape } from "firestore-rules-dsl"
 
-type UserDoc = {
+type User = {
   name: string
   email: string
   createdAt: Date
 }
 
+type Notification = {
+  title: string
+  readAt: Date
+}
+
 type AppClaims = {
   admin: boolean
+  roles: string
 }
 
 type AppDb = DatabaseDefinition<{
-    users: CollectionShape<UserDoc>
+    users: CollectionShape<User, { notifications: Notification }>
   },
   AppClaims
 >
@@ -21,14 +27,24 @@ const buildRules = () => createAstRulesBuilder<AppDb>()
   .withHelpers(($, register) => ({
     isSignedIn: register(
       "isSignedIn",
-      () => $.and(
-        $.request.auth.neq(null),
-        $.request.auth.uid.neq(null),
-      )
+      () => $.hasPath($.request, "auth.uid")
+    ),
+    hasRole: register(
+      "hasRole",
+      ["role"],
+      () => ({
+        roles: $.ifElse(
+          $.hasPath($.request, "auth.token.roles"),
+          $.request.auth.token.roles.split(","),
+          [],
+        ),
+      }),
+      (args, lets) => lets.roles.hasAny([args.role]),
     ),
   }))
   .matches((match) => {
-    match("users/{userId}", ({ allow }, $) => {
+    match("users/{userId}", ({ allow, matches }, $) => {
+      // rules
       allow(
         "read",
         $.and(
@@ -40,6 +56,12 @@ const buildRules = () => createAstRulesBuilder<AppDb>()
         ["create", "update", "delete"],
         $.request.auth.token.admin.eq(true),
       )
+      // sub-collection
+      matches((match) => {
+        match("notifications/{notificationId}", ({allow}, $) => {
+          allow("create", $.hasRole("notifier"))
+        })
+      })
     })
   })
 `
