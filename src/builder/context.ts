@@ -62,7 +62,7 @@ import {
   callMethod,
   callHelper,
 } from "../ast/known-factories"
-import type { EmptyObject } from "./utils"
+import { extractPathParamNames, type EmptyObject } from "./utils"
 
 /** Extracts route params from a path pattern like `users/{userId}/posts/{postId}`. */
 type PathParams<TPath extends string> = TPath extends `${infer Head}/${infer Tail}`
@@ -1175,24 +1175,6 @@ function createAuthProxy(claims: Record<string, unknown>): any {
       },
     },
   )
-}
-
-/**
- * Extracts variable names from a match path pattern.
- *
- * Supports both `{param}` and `{param=**}` syntaxes.
- */
-function extractPathParamNames(pathPattern: string): Set<string> {
-  const names = new Set<string>()
-  const matcher = /\{([A-Za-z_][A-Za-z0-9_]*)(?:=\*\*)?\}/g
-  let match = matcher.exec(pathPattern)
-  while (match) {
-    if (match[1]) {
-      names.add(match[1])
-    }
-    match = matcher.exec(pathPattern)
-  }
-  return names
 }
 
 /**

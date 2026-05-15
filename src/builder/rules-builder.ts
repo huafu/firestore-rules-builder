@@ -26,20 +26,19 @@ import {
   type PublicExpression,
   type RuleValue,
 } from "./context"
-import type { CollectionShape, CustomClaimsOf, DatabaseDefinition } from "./db"
+import type { CustomClaimsOf, DatabaseDefinition, SubcollectionsOf } from "./db"
 import {
   BuilderHelpersManager,
   type BuilderHelpersFactory,
   type DeepMergeHelperLibraries,
   type RegisterContextHelper,
 } from "./helpers"
-import type { EmptyObject } from "./utils"
+import { extractPathParamNames, type EmptyObject } from "./utils"
 /** Internal collection map constraint used by builder generics. */
-type CollectionMap = Record<string, CollectionShape<any, any>>
+type CollectionMap = Record<string, unknown>
 
 /** Extracts nested subcollection map from a collection shape. */
-type Subcollections<TCollection> =
-  TCollection extends CollectionShape<any, infer TSub> ? TSub : never
+type Subcollections<TCollection> = SubcollectionsOf<TCollection>
 /** Extracts collection name from a `collection/{param}` path segment. */
 type CollectionNameFromContextPath<TPath extends string> =
   TPath extends `${infer TCollection}/{${string}}` ? TCollection : never
@@ -50,7 +49,11 @@ type AppendContextPath<TPath extends string, TSegment extends string> = TPath ex
   ? TSegment
   : `${TPath}/${TSegment}`
 /** Narrows unknown subcollection maps into a collection map fallback. */
-type AsCollectionMap<T> = T extends CollectionMap ? T : EmptyObject
+type AsCollectionMap<T> = [T] extends [never]
+  ? EmptyObject
+  : T extends Record<string, unknown>
+    ? T
+    : EmptyObject
 
 /**
  * Allowed condition inputs accepted by `allow(...)`.
@@ -408,6 +411,19 @@ export class FirestoreAstRulesBuilder<
    */
   protected toMatchNode(): MatchDeclarationNode | null {
     if (this.currentPath === null) return null
+
+    // Guard: a param name in this segment must not shadow any ancestor param.
+    const parentPath = this.fullPath.slice(0, this.fullPath.length - this.currentPath.length - 1)
+    if (parentPath) {
+      const parentParams = extractPathParamNames(parentPath)
+      for (const param of extractPathParamNames(this.currentPath)) {
+        if (parentParams.has(param)) {
+          throw new Error(
+            `Path parameter "{${param}}" at "${this.fullPath}" shadows an ancestor parameter with the same name. Use a unique parameter name.`,
+          )
+        }
+      }
+    }
 
     const statements = this.buildStatements()
     if (statements.length === 0) return null
