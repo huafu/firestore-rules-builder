@@ -75,7 +75,7 @@
     "test": "vitest run",
     "check:exports": "tsx scripts/check-package-exports.ts",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.eslint.json --noEmit"
+    "typecheck": "tsc -p tsconfig.eslint.json --noEmit && pnpm --filter firestore-rules-dsl-demo typecheck"
   },
   "devDependencies": {
     "@commitlint/cli": "^20",
