@@ -58,14 +58,18 @@ describe("ast rules builder types", () => {
   })
 
   it("merges helpers into context", () => {
-    const builder = createAstRulesBuilder<Db>().withHelpers((ctx, register) => {
-      const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
-        ctx.request.auth.uid.eq(ownerId),
-      )
+    const builder = createAstRulesBuilder<Db>().withHelpers((ctx, { def, arg }) => {
+      const isOwner = def("isOwner", {
+        args: [arg("ownerId")<string>()],
+        body: ({ ownerId }) => ctx.request.auth.uid.eq(ownerId),
+      })
 
       return {
         isOwner,
-        canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
+        canRead: def("canRead", {
+          args: [arg("ownerId")<string>()],
+          body: ({ ownerId }) => isOwner(ownerId),
+        }),
       }
     })
 
@@ -81,9 +85,10 @@ describe("ast rules builder types", () => {
   })
 
   it("infers nested match types from path argument without explicit generics", () => {
-    const builder = createAstRulesBuilder<Db>().withHelpers((ctx, register) => {
-      const canReadOrg = register("canReadOrg", ["orgId"], ({ orgId }) => {
-        return ctx.request.auth.token.orgId.eq(orgId)
+    const builder = createAstRulesBuilder<Db>().withHelpers((ctx, { def, arg }) => {
+      const canReadOrg = def("canReadOrg", {
+        args: [arg("orgId")<string>()],
+        body: ({ orgId }) => ctx.request.auth.token.orgId.eq(orgId),
       })
       return { canReadOrg }
     })

@@ -1,5 +1,4 @@
-export const defaultSource = `import { createAstRulesBuilder } from "firestore-rules-dsl"
-import type { DatabaseDefinition, CollectionShape } from "firestore-rules-dsl"
+export const defaultSource = `import * as dsl from "firestore-rules-dsl"
 
 type User = {
   name: string
@@ -17,29 +16,31 @@ type AppClaims = {
   roles: string
 }
 
-type AppDb = DatabaseDefinition<{
-    users: CollectionShape<User, { notifications: Notification }>
+type AppDb = dsl.DatabaseDefinition<{
+    users: dsl.CollectionShape<User, { notifications: Notification }>
   },
   AppClaims
 >
 
-const buildRules = () => createAstRulesBuilder<AppDb>()
-  .withHelpers(($, register) => ({
-    isSignedIn: register(
+export default dsl.createAstRulesBuilder<AppDb>()
+  .withHelpers(($, { def, arg }) => ({
+    isSignedIn: def(
       "isSignedIn",
-      () => $.hasPath($.request, "auth.uid")
+      { body: () => $.hasPath($.request, "auth.uid") }
     ),
-    hasRole: register(
+    hasRole: def(
       "hasRole",
-      ["role"],
-      () => ({
-        roles: $.ifElse(
-          $.hasPath($.request, "auth.token.roles"),
-          $.request.auth.token.roles.split(","),
-          [],
-        ),
-      }),
-      (args, lets) => lets.roles.hasAny([args.role]),
+      {
+        args: [arg("role")<string>()],
+        lets: () => ({
+          roles: $.ifElse(
+            $.hasPath($.request, "auth.token.roles"),
+            $.request.auth.token.roles.split(","),
+            [],
+          ),
+        }),
+        body: (args, lets) => lets.roles.hasAny([args.role]),
+      }
     ),
   }))
   .matches((match) => {

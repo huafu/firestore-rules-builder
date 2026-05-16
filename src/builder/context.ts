@@ -109,24 +109,15 @@ type DotPath<T> =
       }[NonFunctionKeys<T>]
     : never
 
-type ValueFromInput<T> = T extends RuleValue<infer U> ? U : T extends RuleValueLiteral ? T : unknown
+type ValueFromInput<T> =
+  T extends RuleValue<any> ? TypeOfRuleValue<T> : T extends RuleValueLiteral ? T : unknown
 
-type ListLikeBranch = {
-  size(): RuleValue<number>
-  hasAll(values: Expr): RuleValue<boolean>
-  hasAny(values: Expr): RuleValue<boolean>
-  hasOnly(values: Expr): RuleValue<boolean>
-}
-
-type IfElseResultValue<C, A> = C extends readonly unknown[]
-  ? C
-  : A extends readonly unknown[]
-    ? A
-    : C extends ListLikeBranch
-      ? unknown[]
-      : A extends ListLikeBranch
-        ? unknown[]
-        : ValueFromInput<C> | ValueFromInput<A>
+type IfElseResultValue<C, A> =
+  ValueFromInput<C> extends never[]
+    ? ValueFromInput<A>
+    : ValueFromInput<A> extends never[]
+      ? ValueFromInput<C>
+      : ValueFromInput<C> | ValueFromInput<A>
 
 /** Common comparison/type-check methods available on all proxied values. */
 type CommonValueMethods = {
@@ -243,6 +234,57 @@ type CommonValueMethods = {
 /** String-specific helper methods available on string-like values. */
 type StringMethods = {
   /**
+   * Returns the number of UTF-16 code units in the string.
+   * @example
+   * ```ts
+   * $.resource.data.name.size().lte(100)
+   * ```
+   */
+  size(): RuleValueProxy<number>
+  /**
+   * Converts the string to lowercase.
+   * @example
+   * ```ts
+   * $.resource.data.email.lower().eq("admin@example.com")
+   * ```
+   */
+  lower(): RuleValueProxy<string>
+  /**
+   * Converts the string to uppercase.
+   * @example
+   * ```ts
+   * $.resource.data.code.upper().eq("ABC")
+   * ```
+   */
+  upper(): RuleValueProxy<string>
+  /**
+   * Removes leading and trailing whitespace from the string.
+   * @example
+   * ```ts
+   * $.resource.data.tag.trim().neq("")
+   * ```
+   */
+  trim(): RuleValueProxy<string>
+  /**
+   * Returns `true` if the string matches the given regular expression.
+   * @param re - A regular expression string.
+   * @example
+   * ```ts
+   * $.resource.data.email.matches(".*@example\\.com")
+   * ```
+   */
+  matches(re: RuleValueInput): RuleValueProxy<boolean>
+  /**
+   * Returns a new string with all regex matches replaced by the substitution string.
+   * @param re - A regular expression string to match.
+   * @param sub - The replacement string.
+   * @example
+   * ```ts
+   * $.resource.data.slug.replace("-", "_")
+   * ```
+   */
+  replace(re: RuleValueInput, sub: RuleValueInput): RuleValueProxy<string>
+  /**
    * Splits a string into an array of substrings using the provided separator.
    * @param separator - The delimiter expression.
    * @example
@@ -251,6 +293,14 @@ type StringMethods = {
    * ```
    */
   split(separator: RuleValueInput): RuleValueProxy<string[]>
+  /**
+   * Converts the string to a byte array (UTF-8 encoded).
+   * @example
+   * ```ts
+   * $.resource.data.token.toUtf8Bytes().size().gt(0)
+   * ```
+   */
+  toUtf8Bytes(): RuleValueProxy<readonly number[]>
 }
 
 /** List-specific helper methods available on array-like values. */
@@ -401,6 +451,7 @@ type MapDiffProxy = Expr & {
   unchangedKeys(): RuleValueProxy<string[]>
 }
 
+declare const __type: unique symbol
 /**
  * Typed proxy representation for rule values.
  *
@@ -413,9 +464,12 @@ type RuleValueProxy<T> = Expr &
   (T extends readonly unknown[] ? ListMethods : EmptyObject) &
   (T extends Record<string, unknown>
     ? MapMethods & { [K in StringKeyOf<T>]: RuleValueProxy<T[K]> }
-    : EmptyObject)
+    : EmptyObject) & {
+    [__type]: T
+  }
 
 export type RuleValue<T = unknown> = RuleValueProxy<T>
+export type TypeOfRuleValue<T> = T extends RuleValueProxy<any> ? T[typeof __type] : never
 
 /** Proxy shape for `resource` and `request.resource`. */
 type ResourceProxy<TDoc> = {
@@ -564,8 +618,8 @@ type GlobalHelpers = {
    */
   ifElse<TConsequent, TAlternate>(
     test: Expr,
-    consequent: TConsequent & RuleValueInput,
-    alternate: TAlternate & RuleValueInput,
+    consequent: TConsequent,
+    alternate: TAlternate,
   ): RuleValue<IfElseResultValue<TConsequent, TAlternate>>
 
   /**
@@ -841,9 +895,43 @@ function createRuleValueProxyHandler(
         return fn
       }
 
+      if (prop === "lower") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "lower", []))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "upper") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "upper", []))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "trim") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "trim", []))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "matches") {
+        const fn = (re: any) =>
+          wrapExpressionInProxy(callMethod(baseExpr, "matches", [toExpressionNode(re)]))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "replace") {
+        const fn = (re: any, sub: any) =>
+          wrapExpressionInProxy(
+            callMethod(baseExpr, "replace", [toExpressionNode(re), toExpressionNode(sub)]),
+          )
+        cache.set(prop, fn)
+        return fn
+      }
       if (prop === "split") {
         const fn = (separator: any) =>
           wrapExpressionInProxy(callMethod(baseExpr, "split", [toExpressionNode(separator)]))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "toUtf8Bytes") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "toUtf8Bytes", []))
         cache.set(prop, fn)
         return fn
       }

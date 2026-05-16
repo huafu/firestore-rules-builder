@@ -1,64 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Editor, { type Monaco, type OnMount } from "@monaco-editor/react"
 import type * as MonacoType from "monaco-editor"
-import ts from "typescript"
-import { createAstRulesBuilder, defineFirestoreRulesLibrary } from "firestore-rules-dsl"
 import brandIcon from "./brand-icon.svg"
 import { defaultSource } from "./defaultSource"
 import { configureMonaco } from "./monacoSetup"
+import { buildPlaygroundSource } from "firestore-rules-dsl/testing"
 
 type PreviewState = {
   rules: string
   error: string | null
 }
 
-function normalizeSourceForExecution(source: string): string {
-  return source.replace(
-    /^\s*import(?:\s+type)?\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm,
-    "",
-  )
-}
-
 function compileRules(source: string): PreviewState {
   try {
-    const sourceForExecution = normalizeSourceForExecution(source)
+    const runner = buildPlaygroundSource(source)
 
-    const transpiled = ts.transpileModule(sourceForExecution, {
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.ESNext,
-        ignoreDeprecations: "6.0",
-        strict: true,
-      },
-      reportDiagnostics: true,
-    })
+    const result = runner()
 
-    if (transpiled.diagnostics && transpiled.diagnostics.length > 0) {
-      const first = transpiled.diagnostics[0]
-      const message = ts.flattenDiagnosticMessageText(first.messageText, "\n")
-      return {
-        rules: "",
-        error: `TypeScript: ${message}`,
-      }
-    }
-
-    // Runtime execution is required for the playground preview.
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const runner = new Function(
-      "createAstRulesBuilder",
-      "defineFirestoreRulesLibrary",
-      `${transpiled.outputText}\nif (typeof buildRules !== "function") { throw new Error("Please define function buildRules() { ... }") }\nreturn buildRules();`,
-    ) as (
-      createAstRulesBuilderRef: typeof createAstRulesBuilder,
-      defineFirestoreRulesLibraryRef: typeof defineFirestoreRulesLibrary,
-    ) => unknown
-
-    const result = runner(createAstRulesBuilder, defineFirestoreRulesLibrary)
     if (typeof result === "string") {
       return { rules: result, error: null }
     }
 
-    if (typeof result === "object" && result !== null && "toString" in result) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (typeof result === "object" && result != null && "toString" in result) {
       const sourceOutput = (result as { toString: () => string }).toString()
       return { rules: sourceOutput, error: null }
     }

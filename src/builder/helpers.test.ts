@@ -23,8 +23,8 @@ type TestDb = DatabaseDefinition<
 describe("builder helpers manager", () => {
   it("supports zero-argument helper shorthand", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (ctx, register) => ({
-        isSignedIn: register("isSignedIn", () => ctx.request.auth.uid.is("string")),
+      (ctx, { def }) => ({
+        isSignedIn: def("isSignedIn", { body: () => ctx.request.auth.uid.is("string") }),
       }),
     )
 
@@ -44,10 +44,11 @@ describe("builder helpers manager", () => {
 
   it("exposes registered helpers on the context", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (ctx, register) => ({
-        isOrgMember: register("isOrgMember", ["orgId"], ({ orgId }) =>
-          ctx.request.auth.token.orgId.eq(orgId),
-        ),
+      (ctx, { def, arg }) => ({
+        isOrgMember: def("isOrgMember", {
+          args: [arg("orgId")<string>()],
+          body: ({ orgId }) => ctx.request.auth.token.orgId.eq(orgId),
+        }),
       }),
     )
 
@@ -69,15 +70,19 @@ describe("builder helpers manager", () => {
 
   it("emits only used helpers and their transitive dependencies", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (ctx, register) => {
-        const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
-          ctx.request.auth.uid.eq(ownerId),
-        )
+      (ctx, { def, arg }) => {
+        const isOwner = def("isOwner", {
+          args: [arg("ownerId")<string>()],
+          body: ({ ownerId }) => ctx.request.auth.uid.eq(ownerId),
+        })
 
         return {
           isOwner,
-          canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
-          unusedHelper: register("unusedHelper", [], () => ctx.request.auth.token.admin),
+          canRead: def("canRead", {
+            args: [arg("ownerId")<string>()],
+            body: ({ ownerId }) => isOwner(ownerId),
+          }),
+          unusedHelper: def("unusedHelper", { body: () => ctx.request.auth.token.admin }),
         }
       },
     )
@@ -106,12 +111,11 @@ describe("builder helpers manager", () => {
 
   it("rejects recursive helper bodies", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (_ctx, register) => {
-        const recursive: (ownerId: RuleValue) => RuleValue = register(
-          "recursive",
-          ["ownerId"],
-          ({ ownerId }) => recursive(ownerId),
-        )
+      (_ctx, { def, arg }) => {
+        const recursive: (ownerId: RuleValue) => RuleValue = def("recursive", {
+          args: [arg("ownerId")()],
+          body: ({ ownerId }) => recursive(ownerId),
+        })
 
         return { recursive }
       },
@@ -137,18 +141,15 @@ describe("builder helpers manager", () => {
 
   it("supports lets-factory helper with zero arguments", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (ctx, register) => {
+      (ctx, { def }) => {
         return {
-          hasAdminAccess: register(
-            "hasAdminAccess",
-            () => ({
+          hasAdminAccess: def("hasAdminAccess", {
+            lets: () => ({
               adminFlag: ctx.request.auth.token.admin,
               orgMatch: ctx.request.auth.token.orgId.eq(ctx.resource.data.orgId),
             }),
-            (lets) => {
-              return ctx.or(lets.adminFlag, lets.orgMatch)
-            },
-          ),
+            body: (_, lets) => ctx.or(lets.adminFlag, lets.orgMatch),
+          }),
         }
       },
     )
@@ -177,21 +178,20 @@ describe("builder helpers manager", () => {
 
   it("supports lets-factory helper with arguments", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (ctx, register) => {
+      (ctx, { def, arg }) => {
         return {
-          checkAccess: register(
-            "checkAccess",
-            ["requiredRole"],
-            () => ({
+          checkAccess: def("checkAccess", {
+            args: [arg("requiredRole")<string>()],
+            lets: () => ({
               userRole: ctx.request.auth.token.admin,
               hasPermission: ctx.request.auth.token.admin.eq("test"),
             }),
-            (args, lets) =>
+            body: (args, lets) =>
               ctx.and(
                 ctx.or(lets.hasPermission, ctx.request.auth.token.admin),
                 ctx.request.auth.token.role.eq(args.requiredRole),
               ),
-          ),
+          }),
         }
       },
     )
@@ -222,23 +222,19 @@ describe("builder helpers manager", () => {
 
   it("tracks dependencies through lets-factory helpers", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (ctx, register) => {
-        const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
-          ctx.request.auth.uid.eq(ownerId),
-        )
+      (ctx, { def, arg }) => {
+        const isOwner = def("isOwner", {
+          args: [arg("ownerId")<string>()],
+          body: ({ ownerId }) => ctx.request.auth.uid.eq(ownerId),
+        })
 
         return {
           isOwner,
-          canModify: register(
-            "canModify",
-            ["ownerId"],
-            (args) => ({
-              ownerCheck: isOwner(args.ownerId),
-            }),
-            (_args, lets) => {
-              return ctx.or(lets.ownerCheck, ctx.request.auth.token.admin)
-            },
-          ),
+          canModify: def("canModify", {
+            args: [arg("ownerId")<string>()],
+            lets: (args) => ({ ownerCheck: isOwner(args.ownerId) }),
+            body: (_args, lets) => ctx.or(lets.ownerCheck, ctx.request.auth.token.admin),
+          }),
         }
       },
     )
@@ -265,15 +261,14 @@ describe("builder helpers manager", () => {
 
   it("handles recursive calls in lets-factory helpers", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
-      (_ctx, register) => {
-        const recursive: () => RuleValue = register(
-          "recursive",
-          () => ({
+      (_ctx, { def }) => {
+        const recursive: () => RuleValue = def("recursive", {
+          lets: () => ({
             // Let initializer calls itself
             check: recursive(),
           }),
-          (lets) => lets.check,
-        )
+          body: (_, lets) => lets.check,
+        })
 
         return { recursive }
       },

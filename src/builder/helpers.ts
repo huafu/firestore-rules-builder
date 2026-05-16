@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-invalid-void-type */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ExpressionNode, FunctionDeclarationNode } from "../ast"
 import {
@@ -65,56 +66,158 @@ export type DeepMergeHelperLibraries<
 /** Values accepted when invoking generated helper callables. */
 type HelperArgument = ExpressionNode | PublicExpression | string | number | boolean | null
 
-/** Mapped helper argument object passed to helper body factories. */
-type HelperArgs<Args extends readonly string[]> = {
-  [K in Args[number]]: RuleValue
-}
+/** Internal constraint for lets-factory functions (used in the register() implementation). */
+type LetsFactory = (...a: any[]) => Record<string, ExpressionNode | PublicExpression | RuleValue>
 
-/** Body factory for helpers that do not take arguments. */
-type ZeroArgHelperBodyFactory = () => ExpressionNode | PublicExpression
+/** Constraint for the `Lets` type parameter: the record returned by a `lets` factory. */
+type LetsConstraint = Record<string, ExpressionNode | PublicExpression | RuleValue>
 
 /**
- * Signature for a helper body factory used in `register(...)`.
+ * A typed argument descriptor created via `arg(name)<T>()`.
+ *
+ * The `type` field is a phantom type used only by TypeScript — it is never
+ * set at runtime. Specifying `T` enables type-specific methods on the argument
+ * inside helper bodies (`StringMethods`, `ListMethods`, `MapMethods`, etc.).
  */
-type HelperBodyFactory<Args extends readonly string[]> = (
-  args: HelperArgs<Args>,
-) => ExpressionNode | PublicExpression
+export interface TypedArgDescriptor<Name extends string, T = unknown> {
+  readonly name: Name
+  readonly type: T
+}
 
-/** Lets (variable definitions) factory for helpers. */
-type HelperLetsFactory<Args extends readonly string[]> = (
-  args: HelperArgs<Args>,
-) => Record<string, ExpressionNode | PublicExpression>
+/**
+ * Creates a typed argument descriptor for use in `def()` config `args` arrays.
+ *
+ * The name is inferred from the argument, and the type is specified in the
+ * second call. This curried form avoids TypeScript's partial type application
+ * problem where an explicit `T` would shadow inference of `Name`:
+ * - `arg("orgId")<string>()` → `RuleValue<string>` with `.split()` etc.
+ * - `arg("items")<readonly string[]>()` → `RuleValue<readonly string[]>` with `.hasAll()` etc.
+ * - `arg("orgId")()` → `RuleValue<unknown>` (untyped fallback)
+ */
+export function arg<const K extends string>(name: K): <T = unknown>() => TypedArgDescriptor<K, T> {
+  return <T>() => ({ name }) as TypedArgDescriptor<K, T>
+}
 
-/** Zero-arg lets factory (returns variable definitions). */
-type ZeroArgHelperLetsFactory = () => Record<string, ExpressionNode | PublicExpression>
+/** Mapped helper argument object derived from a typed descriptor tuple. */
+type HelperArgs<Args extends readonly TypedArgDescriptor<string>[]> = {
+  [A in Args[number] as A extends TypedArgDescriptor<infer N>
+    ? N
+    : never]: A extends TypedArgDescriptor<string, infer T> ? RuleValue<T> : RuleValue
+}
 
-type HelperReturnFromFactory<F extends (...args: any[]) => ExpressionNode | PublicExpression> =
-  ReturnType<F> extends RuleValue<infer T> ? RuleValue<T> : RuleValue
+/**
+ * Configuration for a helper with typed arguments (used in `def(name, config)`).
+ *
+ * - `args` is **required** (non-optional) so TypeScript performs full literal inference,
+ *   preserving arg-name literals as object-property keys.
+ * - `lets` is an optional factory `(args: HelperArgs<Args>) => Lets` whose parameter
+ *   is contextually typed from `args`, enabling destructuring without explicit annotations.
+ * - `Lets` is the **return type** of the `lets` factory (a specific record), which flows
+ *   directly into the `body`'s second parameter for precise property access.
+ */
+export type ArgsHelperConfig<
+  Args extends readonly TypedArgDescriptor<string>[],
+  Lets extends LetsConstraint = Record<never, never>,
+  Body extends ExpressionNode | PublicExpression = ExpressionNode | PublicExpression,
+> = {
+  args: Args
+  lets?: (args: HelperArgs<Args>) => Lets
+  body: (args: HelperArgs<Args>, lets: Lets) => Body
+}
 
+/**
+ * Configuration for a zero-argument helper (used in `def(name, config)`).
+ * Does not include an `args` property — pass `args: [...]` to use the with-args overload.
+ *
+ * - `lets` is an optional zero-arg factory `() => Lets` whose return type flows into `body`.
+ * - `Lets` is the **return type** of the `lets` factory.
+ */
+export type ZeroArgHelperConfig<
+  Lets extends LetsConstraint = Record<never, never>,
+  Body extends ExpressionNode | PublicExpression = ExpressionNode | PublicExpression,
+> = {
+  lets?: () => Lets
+  body: (args: Record<never, never>, lets: Lets) => Body
+}
+
+/**
+ * Union of both helper config shapes. `Args` determines which variant is used:
+ * - `undefined` (default) → `ZeroArgHelperConfig`
+ * - tuple of `TypedArgDescriptor` → `ArgsHelperConfig`
+ */
+export type HelperDefinitionConfig<
+  Args extends readonly TypedArgDescriptor<string>[] | undefined = undefined,
+  Lets extends LetsConstraint = Record<never, never>,
+> = Args extends readonly TypedArgDescriptor<string>[]
+  ? ArgsHelperConfig<Args, Lets>
+  : ZeroArgHelperConfig<Lets>
+
+/**
+ * Type of the `def` function provided inside `withHelpers` factory callbacks.
+ * Registers a named helper and returns its callable proxy.
+ *
+ * Two call signatures (with-args checked **first** so TypeScript uses it whenever
+ * `args` is present):
+ * - With args: `args: [arg(name)<T>(), ...]` → returns `(...callArgs) => RuleValue`
+ * - Zero-arg: no `args` → returns `() => RuleValue`
+ *
+ * `Lets` is the **return type** of the optional `lets` factory, providing precise types
+ * for let-variable properties in the `body`'s second parameter.
+ */
 export type RegisterContextHelper = {
-  <F extends ZeroArgHelperBodyFactory>(
+  <
+    const Args extends readonly TypedArgDescriptor<string>[],
+    Lets extends LetsConstraint = Record<never, never>,
+  >(
     name: string,
-    bodyFactory: F,
-  ): () => HelperReturnFromFactory<F>
-  <const Args extends readonly string[], F extends HelperBodyFactory<Args>>(
+    config: ArgsHelperConfig<Args, Lets>,
+  ): (...callArgs: { [Index in keyof Args]: HelperArgument }) => RuleValue
+  <
+    Lets extends LetsConstraint = Record<never, never>,
+    Body extends ExpressionNode | PublicExpression = ExpressionNode | PublicExpression,
+  >(
     name: string,
-    argNames: Args,
-    bodyFactory: F,
-  ): (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
-  <LF extends ZeroArgHelperLetsFactory>(
+    config: ZeroArgHelperConfig<Lets, Body>,
+  ): () => Body extends RuleValue<infer R> ? RuleValue<R> : RuleValue
+}
+
+/**
+ * Helper authoring API injected as the second parameter of `withHelpers`
+ * factory callbacks. Provides `def` (to register helpers) and `arg` (to
+ * create typed argument descriptors) without requiring any imports.
+ *
+ * `def` is declared as an overloaded method so TypeScript uses native overload
+ * resolution and `const` type parameter inference, preserving literal arg-name
+ * strings as property keys in `body`'s `args` parameter.
+ */
+export interface BuilderHelperAPI {
+  /** Register a helper with typed arguments. `Args` is inferred from the `args` array. */
+  def<
+    const Args extends readonly TypedArgDescriptor<string>[],
+    Lets extends LetsConstraint = Record<never, never>,
+    Body extends ExpressionNode | PublicExpression = ExpressionNode | PublicExpression,
+  >(
+    this: void,
     name: string,
-    letsFactory: LF,
-    bodyFactory: (lets: ReturnType<LF>) => ExpressionNode | PublicExpression,
-  ): () => RuleValue
-  <const Args extends readonly string[], LF extends HelperLetsFactory<Args>>(
+    config: ArgsHelperConfig<Args, Lets, Body>,
+  ): (
+    ...callArgs: { [Index in keyof Args]: HelperArgument }
+  ) => Body extends RuleValue<infer R> ? RuleValue<R> : RuleValue
+  /** Register a zero-argument helper. */
+  def<
+    Lets extends LetsConstraint = Record<never, never>,
+    Body extends ExpressionNode | PublicExpression = ExpressionNode | PublicExpression,
+  >(
+    this: void,
     name: string,
-    argNames: Args,
-    letsFactory: LF,
-    bodyFactory: (
-      args: HelperArgs<Args>,
-      lets: ReturnType<LF>,
-    ) => ExpressionNode | PublicExpression,
-  ): (...args: { [Index in keyof Args]: HelperArgument }) => RuleValue
+    config: ZeroArgHelperConfig<Lets, Body>,
+  ): () => Body extends RuleValue<infer R> ? RuleValue<R> : RuleValue
+  /**
+   * Creates a typed argument descriptor.
+   * `arg("name")<T>()` — specify `T` explicitly to get type-aware methods in the body.
+   * `arg("name")()` — untyped fallback, gives `RuleValue<unknown>`.
+   */
+  arg: typeof arg
 }
 
 /**
@@ -128,7 +231,7 @@ export type BuilderHelpersFactory<
   Db extends DatabaseDefinition<unknown, Record<string, unknown>>,
   AtPath extends string,
   Lib extends Record<string, unknown>,
-> = (context: BuilderContext<Db, AtPath, Lib>, register: RegisterContextHelper) => NewLib
+> = (context: BuilderContext<Db, AtPath, Lib>, helpers: BuilderHelperAPI) => NewLib
 
 function isHelperNamespace(value: unknown): value is HelperLibrary {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -164,12 +267,12 @@ interface HelperDefinition {
   callable: (...args: readonly HelperArgument[]) => RuleValue
   dependencies: Set<string>
   bodyFactory: (
-    args: HelperArgs<readonly string[]>,
+    args: Record<string, RuleValue>,
     lets?: Record<string, RuleValue>,
   ) => ExpressionNode | PublicExpression
   letsFactory?: (
-    args: HelperArgs<readonly string[]>,
-  ) => Record<string, ExpressionNode | PublicExpression>
+    args: Record<string, RuleValue>,
+  ) => Record<string, ExpressionNode | PublicExpression | RuleValue>
   /** Cached resolved let-variable expressions (keyed by variable name), populated by resolveBody(). */
   cachedLets?: Record<string, ExpressionNode>
   cachedBody?: ExpressionNode
@@ -196,7 +299,7 @@ const ReservedContextKeys = new Set([
 /**
  * Converts helper call arguments to expression nodes.
  */
-function toExpressionNode(value: HelperArgument): ExpressionNode {
+function toExpressionNode(value: HelperArgument | RuleValue): ExpressionNode {
   if (typeof value === "string") return stringLiteral(value)
   if (typeof value === "number") return numberLiteral(value)
   if (typeof value === "boolean") return booleanLiteral(value)
@@ -243,7 +346,8 @@ export class BuilderHelpersManager<
   public withHelpers<NewLib extends HelperLibrary>(
     factory: BuilderHelpersFactory<NewLib, Db, AtPath, Lib>,
   ): BuilderHelpersManager<Db, AtPath, DeepMergeHelperLibraries<Lib, NewLib>> {
-    const helpers = factory(this.contextProxy, this.register.bind(this))
+    const api: BuilderHelperAPI = { def: this.register.bind(this), arg }
+    const helpers = factory(this.contextProxy, api)
 
     // Recursively validate namespace trees and ensure every leaf helper was
     // created via `register(...)` on this manager instance.
@@ -349,41 +453,31 @@ export class BuilderHelpersManager<
   /**
    * Registers a single named helper function and returns its callable proxy.
    *
-   * Supports 4 patterns:
-   * 1. register(name, bodyFactory) — expression-only, zero args
-   * 2. register(name, argNames, bodyFactory) — expression-only, with args
-   * 3. register(name, letsFactory, bodyFactory) — with lets, zero args
-   * 4. register(name, argNames, letsFactory, bodyFactory) — with lets and args
+   * Called internally via the `def` property on the `BuilderHelperAPI` object
+   * injected into `withHelpers` factory callbacks.
    */
-  protected register<const Args extends readonly string[], F extends HelperBodyFactory<Args>>(
+  protected register<
+    const Args extends readonly TypedArgDescriptor<string, any>[],
+    Lets extends LetsConstraint = Record<never, never>,
+  >(
     name: string,
-    argNames: Args,
-    bodyFactory: F,
-  ): (...args: { [Index in keyof Args]: HelperArgument }) => HelperReturnFromFactory<F>
-  protected register<F extends ZeroArgHelperBodyFactory>(
+    config: ArgsHelperConfig<Args, Lets>,
+  ): (...callArgs: { [Index in keyof Args]: HelperArgument }) => RuleValue
+  protected register<
+    Lets extends LetsConstraint = Record<never, never>,
+    Body extends ExpressionNode | PublicExpression = ExpressionNode | PublicExpression,
+  >(
     name: string,
-    bodyFactory: F,
-  ): () => HelperReturnFromFactory<F>
-  protected register<LF extends ZeroArgHelperLetsFactory>(
+    config: ZeroArgHelperConfig<Lets, Body>,
+  ): () => Body extends RuleValue<infer R> ? RuleValue<R> : RuleValue
+  protected register(
     name: string,
-    letsFactory: LF,
-    bodyFactory: (lets: ReturnType<LF>) => ExpressionNode | PublicExpression,
-  ): () => RuleValue
-  protected register<const Args extends readonly string[], LF extends HelperLetsFactory<Args>>(
-    name: string,
-    argNames: Args,
-    letsFactory: LF,
-    bodyFactory: (
-      args: HelperArgs<Args>,
-      lets: ReturnType<LF>,
-    ) => ExpressionNode | PublicExpression,
-  ): (...args: { [Index in keyof Args]: HelperArgument }) => RuleValue
-  protected register<const Args extends readonly string[], F extends HelperBodyFactory<Args>>(
-    name: string,
-    argNamesOrLetsFactory: Args | ZeroArgHelperBodyFactory | ZeroArgHelperLetsFactory,
-    bodyFactoryOrLetsFactory?: F | HelperLetsFactory<Args>,
-    bodyFactory?: F,
-  ): (...args: { [Index in keyof Args]: HelperArgument }) => RuleValue {
+    config: {
+      args?: readonly TypedArgDescriptor<string, any>[] | undefined
+      lets?: LetsFactory | undefined
+      body: (args: any, lets: any) => ExpressionNode | PublicExpression
+    },
+  ): (...callArgs: HelperArgument[]) => RuleValue {
     if (ReservedContextKeys.has(name)) {
       throw new Error(`Helper "${name}" cannot overwrite a built-in context property.`)
     }
@@ -391,161 +485,47 @@ export class BuilderHelpersManager<
       throw new Error(`Helper "${name}" is already registered.`)
     }
 
-    // Pattern detection: determine which of the 4 patterns this call matches
-    const isArray = Array.isArray(argNamesOrLetsFactory)
-    const secondArgIsFunction = typeof bodyFactoryOrLetsFactory === "function"
-    const thirdArgIsFunction = typeof bodyFactory === "function"
+    const argNames = config.args?.map((d) => d.name) ?? []
 
-    // Pattern 1: register(name, bodyFactory) — 2 args, 2nd is function
-    if (
-      typeof argNamesOrLetsFactory === "function" &&
-      !secondArgIsFunction &&
-      !thirdArgIsFunction
-    ) {
-      const bodyFactoryOnly = argNamesOrLetsFactory
-
-      const callable = (): RuleValue => {
-        if (this.resolutionStack.includes(name)) {
-          throw new Error(`Recursive helper call detected for "${name}".`)
-        }
-
-        const currentHelper = this.resolutionStack[this.resolutionStack.length - 1]
-        if (currentHelper) {
-          this.definitions.get(currentHelper)?.dependencies.add(name)
-        }
-
-        this.usedHelpers.add(name)
-        return proxyRuleValue(callHelper(name, []))
+    const callable = (...args: HelperArgument[]): RuleValue => {
+      if (args.length < argNames.length) {
+        const missingIndex = args.length
+        const missingName = argNames[missingIndex]
+        throw new Error(`Missing argument ${missingIndex} (${missingName}) for helper "${name}".`)
+      }
+      if (this.resolutionStack.includes(name)) {
+        throw new Error(`Recursive helper call detected for "${name}".`)
       }
 
-      this.definitions.set(name, {
-        name,
-        argNames: [],
-        callable,
-        bodyFactory: () => bodyFactoryOnly(),
-        dependencies: new Set<string>(),
-      })
-
-      return callable
-    }
-
-    // Pattern 2: register(name, argNames, bodyFactory) — 3 args, 2nd is array
-    if (isArray && secondArgIsFunction && !thirdArgIsFunction) {
-      const argNames = argNamesOrLetsFactory as string[]
-      const bodyFactoryArg = bodyFactoryOrLetsFactory as HelperBodyFactory<any>
-
-      const callable = (...args: HelperArgument[]) => {
-        if (args.length < argNames.length) {
-          const missingIndex = args.length
-          const missingName = argNames[missingIndex]
-          throw new Error(`Missing argument ${missingIndex} (${missingName}) for helper "${name}".`)
-        }
-        if (this.resolutionStack.includes(name)) {
-          throw new Error(`Recursive helper call detected for "${name}".`)
-        }
-
-        const currentHelper = this.resolutionStack[this.resolutionStack.length - 1]
-        if (currentHelper) {
-          this.definitions.get(currentHelper)?.dependencies.add(name)
-        }
-
-        this.usedHelpers.add(name)
-        return proxyRuleValue(callHelper(name, args.map(toExpressionNode)))
+      const currentHelper = this.resolutionStack[this.resolutionStack.length - 1]
+      if (currentHelper) {
+        this.definitions.get(currentHelper)?.dependencies.add(name)
       }
 
-      this.definitions.set(name, {
-        name,
-        argNames: [...argNames],
-        callable,
-        bodyFactory: (helperArgs: HelperArgs<any>) => bodyFactoryArg(helperArgs),
-        dependencies: new Set<string>(),
-      })
-
-      return callable as (
-        ...args: { [Index in keyof Args]: HelperArgument }
-      ) => HelperReturnFromFactory<F>
+      this.usedHelpers.add(name)
+      return proxyRuleValue(callHelper(name, args.map(toExpressionNode)))
     }
 
-    // Pattern 3: register(name, letsFactory, bodyFactory) — 3 args, 2nd & 3rd are functions
-    if (typeof argNamesOrLetsFactory === "function" && secondArgIsFunction && !thirdArgIsFunction) {
-      const letsFactoryArg = argNamesOrLetsFactory as ZeroArgHelperLetsFactory
-      const bodyFactoryArg = bodyFactoryOrLetsFactory as (
-        lets: Record<string, RuleValue>,
-      ) => ExpressionNode | PublicExpression
-
-      const callable = (): RuleValue => {
-        if (this.resolutionStack.includes(name)) {
-          throw new Error(`Recursive helper call detected for "${name}".`)
-        }
-
-        const currentHelper = this.resolutionStack[this.resolutionStack.length - 1]
-        if (currentHelper) {
-          this.definitions.get(currentHelper)?.dependencies.add(name)
-        }
-
-        this.usedHelpers.add(name)
-        return proxyRuleValue(callHelper(name, []))
-      }
-
-      this.definitions.set(name, {
-        name,
-        argNames: [],
-        callable,
-        bodyFactory: (_, lets) => bodyFactoryArg(lets || {}),
-        letsFactory: letsFactoryArg,
-        dependencies: new Set<string>(),
-      })
-
-      return callable
+    const definition: HelperDefinition = {
+      name,
+      argNames,
+      callable,
+      bodyFactory: (helperArgs, lets) =>
+        (config.body as (a: any, l: any) => ExpressionNode | PublicExpression)(
+          helperArgs,
+          lets ?? {},
+        ),
+      dependencies: new Set<string>(),
     }
 
-    // Pattern 4: register(name, argNames, letsFactory, bodyFactory) — 4 args
-    if (isArray && secondArgIsFunction && thirdArgIsFunction) {
-      const argNames = argNamesOrLetsFactory as string[]
-      const letsFactoryArg = bodyFactoryOrLetsFactory as HelperLetsFactory<any>
-      const bodyFactoryArg = bodyFactory as (
-        args: HelperArgs<any>,
-        lets: Record<string, RuleValue>,
-      ) => ExpressionNode | PublicExpression
-
-      const callable = (...args: HelperArgument[]) => {
-        if (args.length < argNames.length) {
-          const missingIndex = args.length
-          const missingName = argNames[missingIndex]
-          throw new Error(`Missing argument ${missingIndex} (${missingName}) for helper "${name}".`)
-        }
-        if (this.resolutionStack.includes(name)) {
-          throw new Error(`Recursive helper call detected for "${name}".`)
-        }
-
-        const currentHelper = this.resolutionStack[this.resolutionStack.length - 1]
-        if (currentHelper) {
-          this.definitions.get(currentHelper)?.dependencies.add(name)
-        }
-
-        this.usedHelpers.add(name)
-        return proxyRuleValue(callHelper(name, args.map(toExpressionNode)))
-      }
-
-      this.definitions.set(name, {
-        name,
-        argNames: [...argNames],
-        callable: callable,
-        bodyFactory: (helperArgs, lets) => bodyFactoryArg(helperArgs, lets || {}),
-        letsFactory: (helperArgs) => letsFactoryArg(helperArgs),
-        dependencies: new Set<string>(),
-      })
-
-      return callable as (...args: { [Index in keyof Args]: HelperArgument }) => RuleValue
+    if (config.lets) {
+      const letsFactory = config.lets
+      definition.letsFactory = (helperArgs) => letsFactory(helperArgs)
     }
 
-    throw new Error(
-      `Invalid helper registration for "${name}". ` +
-        "Supported patterns: register(name, bodyFactory), " +
-        "register(name, argNames, bodyFactory), " +
-        "register(name, letsFactory, bodyFactory), or " +
-        "register(name, argNames, letsFactory, bodyFactory).",
-    )
+    this.definitions.set(name, definition)
+
+    return callable
   }
 
   /**
