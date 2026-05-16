@@ -55,6 +55,34 @@ type AsCollectionMap<T> = [T] extends [never]
     ? T
     : EmptyObject
 
+type CollectionScopeBuilder<
+  Db extends DatabaseDefinition<CollectionMap, Record<string, unknown>>,
+  Ns extends CollectionMap,
+  AtPath extends string,
+  Lib extends Record<string, unknown>,
+  TPath extends ContextPathForCollection<Extract<keyof Ns, string>>,
+> = FirestoreAstRulesBuilder<
+  Db,
+  AsCollectionMap<Subcollections<Ns[CollectionNameFromContextPath<TPath>]>>,
+  AppendContextPath<AtPath, TPath>,
+  Lib
+>
+
+type CollectionScopeCallbackView<
+  Db extends DatabaseDefinition<CollectionMap, Record<string, unknown>>,
+  Ns extends CollectionMap,
+  AtPath extends string,
+  Lib extends Record<string, unknown>,
+  TPath extends ContextPathForCollection<Extract<keyof Ns, string>>,
+> = Omit<CollectionScopeBuilder<Db, Ns, AtPath, Lib, TPath>, "allow" | "matches"> & {
+  allow: (
+    ...args: Parameters<CollectionScopeBuilder<Db, Ns, AtPath, Lib, TPath>["allow"]>
+  ) => ReturnType<CollectionScopeBuilder<Db, Ns, AtPath, Lib, TPath>["allow"]>
+  matches: (
+    ...args: Parameters<CollectionScopeBuilder<Db, Ns, AtPath, Lib, TPath>["matches"]>
+  ) => ReturnType<CollectionScopeBuilder<Db, Ns, AtPath, Lib, TPath>["matches"]>
+}
+
 /**
  * Allowed condition inputs accepted by `allow(...)`.
  *
@@ -319,31 +347,16 @@ export class FirestoreAstRulesBuilder<
       match: <const TPath extends ContextPathForCollection<Extract<keyof Ns, string>>>(
         path: TPath,
         configure?: (
-          builder: FirestoreAstRulesBuilder<
-            Db,
-            AsCollectionMap<Subcollections<Ns[CollectionNameFromContextPath<TPath>]>>,
-            AppendContextPath<AtPath, TPath>,
-            Lib
-          >,
+          builder: CollectionScopeCallbackView<Db, Ns, AtPath, Lib, TPath>,
           context: BuilderContext<Db, AppendContextPath<AtPath, TPath>, Lib>,
         ) => void,
-      ) => FirestoreAstRulesBuilder<
-        Db,
-        AsCollectionMap<Subcollections<Ns[CollectionNameFromContextPath<TPath>]>>,
-        AppendContextPath<AtPath, TPath>,
-        Lib
-      >,
+      ) => CollectionScopeCallbackView<Db, Ns, AtPath, Lib, TPath>,
     ) => void,
   ): this {
     const match = <const TPath extends ContextPathForCollection<Extract<keyof Ns, string>>>(
       path: TPath,
       configure?: (
-        builder: FirestoreAstRulesBuilder<
-          Db,
-          AsCollectionMap<Subcollections<Ns[CollectionNameFromContextPath<TPath>]>>,
-          AppendContextPath<AtPath, TPath>,
-          Lib
-        >,
+        builder: CollectionScopeCallbackView<Db, Ns, AtPath, Lib, TPath>,
         context: BuilderContext<Db, AppendContextPath<AtPath, TPath>, Lib>,
       ) => void,
     ) => {
@@ -359,7 +372,7 @@ export class FirestoreAstRulesBuilder<
         })
         configure(child, context)
       }
-      return child
+      return child as CollectionScopeCallbackView<Db, Ns, AtPath, Lib, TPath>
     }
 
     builder(match)

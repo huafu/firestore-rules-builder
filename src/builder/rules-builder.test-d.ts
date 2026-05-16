@@ -25,6 +25,21 @@ type Db = DatabaseDefinition<
 
 describe("ast rules builder types", () => {
   it("types path params and claims in callbacks", () => {
+    const destructureBuilder = createAstRulesBuilder<Db>()
+
+    destructureBuilder.matches((match) => {
+      match("users/{userId}", ({ allow, matches }, ctx) => {
+        allow("get", ctx.request.auth.uid.eq(ctx.resource.data.ownerId))
+
+        matches((nestedMatch) => {
+          nestedMatch("posts/{postId}", ({ allow: allowPost }, postCtx) => {
+            expectTypeOf(postCtx.params).toEqualTypeOf<{ userId: string; postId: string }>()
+            allowPost("get", postCtx.resource.data.title.neq(""))
+          })
+        })
+      })
+    })
+
     const builder = createAstRulesBuilder<Db>()
 
     builder.matches((match) => {
