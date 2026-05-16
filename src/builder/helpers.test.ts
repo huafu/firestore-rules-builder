@@ -184,7 +184,7 @@ describe("builder helpers manager", () => {
             args: [arg("requiredRole")<string>()],
             lets: () => ({
               userRole: ctx.request.auth.token.admin,
-              hasPermission: ctx.request.auth.token.admin.eq("test"),
+              hasPermission: ctx.request.auth.token.admin.eq(true),
             }),
             body: (args, lets) =>
               ctx.and(

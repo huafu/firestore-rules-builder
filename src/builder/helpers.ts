@@ -190,7 +190,7 @@ export type RegisterContextHelper = {
  * resolution and `const` type parameter inference, preserving literal arg-name
  * strings as property keys in `body`'s `args` parameter.
  */
-export interface BuilderHelperAPI {
+export interface BuilderHelperApi {
   /** Register a helper with typed arguments. `Args` is inferred from the `args` array. */
   def<
     const Args extends readonly TypedArgDescriptor<string>[],
@@ -231,7 +231,7 @@ export type BuilderHelpersFactory<
   Db extends DatabaseDefinition<unknown, Record<string, unknown>>,
   AtPath extends string,
   Lib extends Record<string, unknown>,
-> = (context: BuilderContext<Db, AtPath, Lib>, helpers: BuilderHelperAPI) => NewLib
+> = (context: BuilderContext<Db, AtPath, Lib>, helpers: BuilderHelperApi) => NewLib
 
 function isHelperNamespace(value: unknown): value is HelperLibrary {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -346,7 +346,7 @@ export class BuilderHelpersManager<
   public withHelpers<NewLib extends HelperLibrary>(
     factory: BuilderHelpersFactory<NewLib, Db, AtPath, Lib>,
   ): BuilderHelpersManager<Db, AtPath, DeepMergeHelperLibraries<Lib, NewLib>> {
-    const api: BuilderHelperAPI = { def: this.register.bind(this), arg }
+    const api: BuilderHelperApi = { def: this.register.bind(this), arg }
     const helpers = factory(this.contextProxy, api)
 
     // Recursively validate namespace trees and ensure every leaf helper was
