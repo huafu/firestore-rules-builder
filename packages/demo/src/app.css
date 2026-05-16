@@ -222,6 +222,43 @@ h1 {
   border-color: var(--mint);
 }
 
+.example-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.example-select {
+  appearance: none;
+  background: #0d1729;
+  border: 1px solid var(--surface-border);
+  color: var(--text-0);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 1.8rem 0.3rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2398acc9' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.example-select:hover,
+.example-select:focus-visible {
+  color: var(--mint);
+  border-color: var(--mint);
+  outline: none;
+}
+
+.example-select option {
+  background: var(--bg-1);
+  color: var(--text-0);
+}
+
 h2 {
   margin: 0;
   font-size: 1rem;

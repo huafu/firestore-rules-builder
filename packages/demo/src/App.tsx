@@ -1,10 +1,37 @@
+/* eslint-disable @typescript-eslint/no-confusing-void-expression */
 import { useEffect, useMemo, useRef, useState } from "react"
 import Editor, { type Monaco, type OnMount } from "@monaco-editor/react"
 import type * as MonacoType from "monaco-editor"
 import brandIcon from "./brand-icon.svg"
-import { defaultSource } from "./defaultSource"
-import { configureMonaco } from "./monacoSetup"
+import { configureMonaco } from "./monaco.setup"
 import { buildPlaygroundSource } from "firestore-rules-dsl/testing"
+
+const exampleModules = import.meta.glob<string>("./examples/*.ts", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+})
+
+type ExampleEntry = { key: string; label: string; source: string }
+
+const examples: ExampleEntry[] = Object.entries(exampleModules)
+  .map(([path, source]) => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const filename = path.split("/").pop()!.replace(/\.ts$/, "")
+    const label = filename
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ")
+    return { key: filename, label, source }
+  })
+  .sort((a, b) => {
+    // "default" always first
+    if (a.key === "default") return -1
+    if (b.key === "default") return 1
+    return a.label.localeCompare(b.label)
+  })
+
+const defaultExample = examples.find((e) => e.key === "default") ?? examples[0]
 
 type PreviewState = {
   rules: string
@@ -47,12 +74,21 @@ function formatCount(n: number): string {
 
 export function App() {
   const dslVersion = __DSL_VERSION__
-  const [source, setSource] = useState(defaultSource)
-  const [preview, setPreview] = useState<PreviewState>(() => compileRules(defaultSource))
+  const [selectedExample, setSelectedExample] = useState(defaultExample.key)
+  const [source, setSource] = useState(defaultExample.source)
+  const [preview, setPreview] = useState<PreviewState>(() => compileRules(defaultExample.source))
   const [npmDownloads, setNpmDownloads] = useState<number | null>(null)
   const [githubStars, setGithubStars] = useState<number | null>(null)
   const [tsMarkers, setTsMarkers] = useState<MonacoType.editor.IMarker[]>([])
   const monacoRef = useRef<Monaco | null>(null)
+
+  const loadExample = (key: string) => {
+    const entry = examples.find((e) => e.key === key)
+    if (entry) {
+      setSelectedExample(key)
+      setSource(entry.source)
+    }
+  }
 
   useEffect(() => {
     fetch("https://api.npmjs.org/downloads/point/last-month/firestore-rules-dsl")
@@ -193,15 +229,28 @@ export function App() {
           <div className="panel-head">
             <div className="panel-head-row">
               <h2>TypeScript editor</h2>
-              <button
-                className="reset-btn"
-                onClick={() => {
-                  setSource(defaultSource)
-                }}
-                title="Reset to default example"
-              >
-                Reset
-              </button>
+              <div className="example-picker">
+                <select
+                  id="example-select"
+                  className="example-select"
+                  value={selectedExample}
+                  onChange={(e) => loadExample(e.target.value)}
+                  title="Load an example"
+                >
+                  {examples.map((ex) => (
+                    <option key={ex.key} value={ex.key}>
+                      {ex.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="reset-btn"
+                  onClick={() => loadExample(selectedExample)}
+                  title="Reload current example"
+                >
+                  ↻ Reset
+                </button>
+              </div>
             </div>
             <span>Autocomplete, diagnostics, and instant execution contract</span>
           </div>
