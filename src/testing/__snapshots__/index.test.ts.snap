@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`playground source builder > renders rules from the playground default source 1`] = `
+exports[`playground source builder > renders rules from the ''default'' example 1`] = `
 "rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -16,6 +16,30 @@ service cloud.firestore {
       allow create, update, delete: if request.auth.token.admin == true;
       match /notifications/{notificationId} {
         allow create: if hasRole('notifier');
+      }
+    }
+  }
+}
+"
+`;
+
+exports[`playground source builder > renders rules from the ''simple-blog'' example 1`] = `
+"rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+    function isOwner(authorId) {
+      return request.auth.uid == authorId;
+    }
+    match /posts/{postId} {
+      allow read: if resource.data.published == true;
+      allow create: if isSignedIn() && resource.data.authorId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.authorId);
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() && isOwner(resource.data.authorId);
       }
     }
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
 import type { RuleValue } from "../builder/context"
@@ -177,22 +177,21 @@ describe("testing harness", () => {
   })
 })
 
-function loadDemoDefaultSource(): string {
-  const demoSourcePath = path.resolve(process.cwd(), "packages/demo/src/defaultSource.ts")
-  const fileContent = readFileSync(demoSourcePath, "utf8")
-  const match = fileContent.match(/export const defaultSource = `([\s\S]*)`\s*$/)
+function discoverExamples(): { name: string; source: string }[] {
+  const examplesDir = path.resolve(process.cwd(), "packages/demo/src/examples")
+  const files = readdirSync(examplesDir).filter((f) => f.endsWith(".ts"))
 
-  if (!match || !match[1]) {
-    throw new Error("Unable to parse defaultSource from packages/demo/src/defaultSource.ts")
-  }
-
-  return match[1]
+  return files.map((file) => ({
+    name: file.replace(/\.ts$/, ""),
+    source: readFileSync(path.join(examplesDir, file), "utf8"),
+  }))
 }
 
 describe("playground source builder", () => {
-  it("renders rules from the playground default source", () => {
-    const defaultSource = loadDemoDefaultSource()
-    const runner = buildPlaygroundSource(defaultSource)
+  const examples = discoverExamples()
+
+  it.each(examples)("renders rules from the '$name' example", ({ source }) => {
+    const runner = buildPlaygroundSource(source)
 
     const result = runner()
     const renderedSource =
@@ -201,3 +200,4 @@ describe("playground source builder", () => {
     expect(renderedSource).toMatchSnapshot()
   })
 })
+
