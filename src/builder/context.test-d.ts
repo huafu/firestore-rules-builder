@@ -13,6 +13,11 @@ type Db = DatabaseDefinition<
           city: string
         }
         userIds: Record<string, boolean>
+        types: {
+          str: string
+          num: number
+          bool: boolean
+        }
       },
       {
         posts: CollectionShape<{
@@ -133,35 +138,60 @@ describe("builder context types", () => {
     expectTypeOf<ReturnType<Ctx["hasPath"]>>().toExtend<PublicExpression>()
   })
 
-  it("accepts primitive and null values in comparison helpers", () => {
+  it("accepts correct types for string field eq/neq", () => {
+    type StrEqParam = Parameters<Ctx["resource"]["data"]["types"]["str"]["eq"]>[0]
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["types"]["str"]["eq"]>>().toExtend<PublicExpression>()
+
+    // string field eq accepts string and null
+    expectTypeOf<StrEqParam>().extract<string>().toEqualTypeOf<string>()
+    expectTypeOf<StrEqParam>().extract<null>().toEqualTypeOf<null>()
+
+    // string field eq rejects number and boolean
+    expectTypeOf<StrEqParam>().extract<number>().toEqualTypeOf<never>()
+    expectTypeOf<StrEqParam>().extract<boolean>().toEqualTypeOf<never>()
+  })
+
+  it("accepts correct types for number field eq/neq", () => {
+    type NumEqParam = Parameters<Ctx["resource"]["data"]["types"]["num"]["eq"]>[0]
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["types"]["num"]["eq"]>>().toExtend<PublicExpression>()
+
+    // number field eq accepts number and null
+    expectTypeOf<NumEqParam>().extract<number>().toEqualTypeOf<number>()
+    expectTypeOf<NumEqParam>().extract<null>().toEqualTypeOf<null>()
+
+    // number field eq rejects string and boolean
+    expectTypeOf<NumEqParam>().extract<string>().toEqualTypeOf<never>()
+    expectTypeOf<NumEqParam>().extract<boolean>().toEqualTypeOf<never>()
+  })
+
+  it("accepts correct types for boolean field eq/neq", () => {
+    type BoolEqParam = Parameters<Ctx["resource"]["data"]["types"]["bool"]["eq"]>[0]
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["types"]["bool"]["eq"]>>().toExtend<PublicExpression>()
+
+    // boolean field eq accepts boolean and null
+    expectTypeOf<BoolEqParam>().extract<boolean>().toEqualTypeOf<boolean>()
+    expectTypeOf<BoolEqParam>().extract<null>().toEqualTypeOf<null>()
+
+    // boolean field eq rejects string and number
+    expectTypeOf<BoolEqParam>().extract<string>().toEqualTypeOf<never>()
+    expectTypeOf<BoolEqParam>().extract<number>().toEqualTypeOf<never>()
+  })
+
+  it("accepts correct types for object|null auth neq", () => {
+    type AuthNeqParam = Parameters<Ctx["request"]["auth"]["neq"]>[0]
     expectTypeOf<ReturnType<Ctx["request"]["auth"]["neq"]>>().toExtend<PublicExpression>()
-    expectTypeOf<ReturnType<Ctx["resource"]["data"]["name"]["eq"]>>().toExtend<PublicExpression>()
-    expectTypeOf<ReturnType<Ctx["resource"]["data"]["name"]["gt"]>>().toExtend<PublicExpression>()
 
-    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
-      .extract<null>()
-      .toEqualTypeOf<null>()
-    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
-      .extract<string>()
-      .toEqualTypeOf<string>()
-    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
-      .extract<number>()
-      .toEqualTypeOf<number>()
-    expectTypeOf<Parameters<Ctx["request"]["auth"]["neq"]>[0]>()
-      .extract<boolean>()
-      .toEqualTypeOf<boolean>()
+    // auth neq accepts null (since auth is { ... } | null)
+    expectTypeOf<AuthNeqParam>().extract<null>().toEqualTypeOf<null>()
 
-    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
-      .extract<null>()
-      .toEqualTypeOf<null>()
-    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
-      .extract<string>()
-      .toEqualTypeOf<string>()
-    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
-      .extract<number>()
-      .toEqualTypeOf<number>()
-    expectTypeOf<Parameters<Ctx["resource"]["data"]["name"]["eq"]>[0]>()
-      .extract<boolean>()
-      .toEqualTypeOf<boolean>()
+    // auth neq rejects raw primitives (only accepts the object shape or null)
+    expectTypeOf<AuthNeqParam>().extract<string>().toEqualTypeOf<never>()
+    expectTypeOf<AuthNeqParam>().extract<number>().toEqualTypeOf<never>()
+    expectTypeOf<AuthNeqParam>().extract<boolean>().toEqualTypeOf<never>()
+  })
+
+  it("returns PublicExpression from gt on typed fields", () => {
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["types"]["str"]["gt"]>>().toExtend<PublicExpression>()
+    expectTypeOf<ReturnType<Ctx["resource"]["data"]["types"]["num"]["gt"]>>().toExtend<PublicExpression>()
   })
 })
