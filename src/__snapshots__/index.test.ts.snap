@@ -42,7 +42,7 @@ service cloud.firestore {
       match /projects/{projectId} {
         allow read: if resource.data.public == true || isMemberOfOrg(orgId) && resource.data.status == 'active';
         allow create: if isMemberOfOrg(orgId) && resource.data.ownerId == request.auth.uid && resource.data.status == 'active';
-        allow update: if isOwner(resource.data.ownerId) || isAdmin() && !(resource.data.status == 'deleted');
+        allow update: if isOwner(resource.data.ownerId) || isAdmin() && !(resource.data.status == 'archived');
         allow delete: if isOwner(resource.data.ownerId);
       }
       match /invites/{inviteId} {

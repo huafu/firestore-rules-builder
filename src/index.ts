@@ -25,7 +25,7 @@ export type {
 
 export type {
   ArgsHelperConfig,
-  BuilderHelperAPI,
+  BuilderHelperApi as BuilderHelperAPI,
   BuilderHelpersFactory,
   HelperDefinitionConfig,
   HelperFunction,

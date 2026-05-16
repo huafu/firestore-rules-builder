@@ -83,7 +83,7 @@ describe("root barrel real-world integration", () => {
           body: ({ orgId }) => ctx.request.auth.token.orgId.eq(orgId),
         })
         const notExpired = def("notExpired", {
-          args: [arg("expiresAt")<Date>()],
+          args: [arg("expiresAt")<number>()],
           body: ({ expiresAt }) => ctx.request.time.lt(expiresAt),
         })
         const listRoles = def("listRoles", {
@@ -178,7 +178,7 @@ describe("root barrel real-world integration", () => {
               "update",
               $.or(
                 $.isOwner($.resource.data.ownerId),
-                $.and($.isAdmin(), $.not($.resource.data.status.eq("deleted"))),
+                $.and($.isAdmin(), $.not($.resource.data.status.eq("archived"))),
               ),
             )
 
