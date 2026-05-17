@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0](https://github.com/huafu/firestore-rules-dsl/compare/v1.3.0...v2.0.0) (2026-05-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **library:** helper argument typing is now enforced. Existing code that passed loosely typed or mismatched helper arguments may fail type-checking and must be updated to match declared helper parameter types.
+
+### Features
+
+* **builder:** ✨ enhance helper function type inference ([e2e5c40](https://github.com/huafu/firestore-rules-dsl/commit/e2e5c402414c5a9b92049d5a57bfd3f6e829c084))
+* **builder:** ✨ improve rules builder type definitions ([b0eff8e](https://github.com/huafu/firestore-rules-dsl/commit/b0eff8e65d0dedc57187c163f3fc17f450d5de5f))
+* **builder:** ✨ type helper context for function arguments ([11f9968](https://github.com/huafu/firestore-rules-dsl/commit/11f996856676049279becadf849d20d449b53d2a))
+* **index:** ✨ integrate typed argument functionality ([1c5ae31](https://github.com/huafu/firestore-rules-dsl/commit/1c5ae3127af0b425db83cd3792c69346a97c262c))
+* **library:** ✨ export enhanced type definitions for helpers ([7bee0b5](https://github.com/huafu/firestore-rules-dsl/commit/7bee0b53b6584301f809e967ffc25884b02a0e36))
+* **library:** ✨ type helper function arguments from declared signatures ([6f8d44d](https://github.com/huafu/firestore-rules-dsl/commit/6f8d44d0834146aab53c73aea73db99a2accfb6a))
+
 ## [1.3.0](https://github.com/huafu/firestore-rules-dsl/compare/v1.2.0...v1.3.0) (2026-05-15)
 
 
