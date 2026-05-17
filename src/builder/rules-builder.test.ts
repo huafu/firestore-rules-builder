@@ -59,15 +59,19 @@ describe("ast rules builder", () => {
   })
 
   it("emits only used helpers and their dependencies", () => {
-    const builder = createAstRulesBuilder<TestDb>().withHelpers((ctx, register) => {
-      const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) =>
-        ctx.request.auth.uid.eq(ownerId),
-      )
+    const builder = createAstRulesBuilder<TestDb>().withHelpers((ctx, { def, arg }) => {
+      const isOwner = def("isOwner", {
+        args: [arg("ownerId")<string>()],
+        body: ({ ownerId }) => ctx.request.auth.uid.eq(ownerId),
+      })
 
       return {
         isOwner,
-        canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
-        neverUsed: register("neverUsed", [], () => ctx.request.auth.token.admin),
+        canRead: def("canRead", {
+          args: [arg("ownerId")<string>()],
+          body: ({ ownerId }) => isOwner(ownerId),
+        }),
+        neverUsed: def("neverUsed", { body: () => ctx.request.auth.token.admin }),
       }
     })
 
@@ -146,12 +150,11 @@ describe("ast rules builder", () => {
   })
 
   it("rejects recursive helper definitions", () => {
-    const builder = createAstRulesBuilder<TestDb>().withHelpers((_ctx, register) => {
-      const recursive: (ownerId: RuleValue) => RuleValue = register(
-        "recursive",
-        ["ownerId"],
-        ({ ownerId }) => recursive(ownerId),
-      )
+    const builder = createAstRulesBuilder<TestDb>().withHelpers((_ctx, { def, arg }) => {
+      const recursive: (ownerId: RuleValue) => RuleValue = def("recursive", {
+        args: [arg("ownerId")()],
+        body: ({ ownerId }) => recursive(ownerId),
+      })
 
       return { recursive }
     })

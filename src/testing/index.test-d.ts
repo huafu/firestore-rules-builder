@@ -25,14 +25,14 @@ type Db = DatabaseDefinition<
 >
 
 type AuthLibrary = {
-  isSignedIn: () => RuleValue
-  canRead: () => RuleValue
+  isSignedIn: () => RuleValue<boolean>
+  canRead: () => RuleValue<boolean>
 }
 
 type NamespacedAuthLibrary = {
   auth: {
-    isSignedIn: () => RuleValue
-    canRead: () => RuleValue
+    isSignedIn: () => RuleValue<boolean>
+    canRead: () => RuleValue<boolean>
   }
 }
 
@@ -70,20 +70,24 @@ describe("testing utilities types", () => {
   })
 
   it("types helper library test harness helpers", () => {
-    const library = defineFirestoreRulesLibrary((ctx, register) => {
-      const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+    const library = defineFirestoreRulesLibrary((ctx, { def }) => {
+      const isSignedIn = def("isSignedIn", {
+        body: () => ctx.request.auth.uid.is("string"),
+      })
 
       return {
         isSignedIn,
-        canRead: register("canRead", [], () => isSignedIn()),
+        canRead: def("canRead", {
+          body: () => isSignedIn(),
+        }),
       }
     })
 
     const harness = createHelperLibraryTestHarness<Db, AuthLibrary>(library, (builder) => {
       builder.matches((match) => {
         match("users/{userId}", (users, $) => {
-          expectTypeOf($.isSignedIn()).toHaveProperty("eq")
-          expectTypeOf($.canRead()).toHaveProperty("eq")
+          expectTypeOf($.isSignedIn()).toEqualTypeOf<RuleValue<boolean>>()
+          expectTypeOf($.canRead()).toEqualTypeOf<RuleValue<boolean>>()
           users.allow("read", $.canRead())
         })
       })
@@ -94,13 +98,17 @@ describe("testing utilities types", () => {
   })
 
   it("types namespaced helper library exports", () => {
-    const namespacedLibrary = defineFirestoreRulesLibrary((ctx, register) => {
-      const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+    const namespacedLibrary = defineFirestoreRulesLibrary((ctx, { def }) => {
+      const isSignedIn = def("isSignedIn", {
+        body: () => ctx.request.auth.uid.is("string"),
+      })
 
       return {
         auth: {
           isSignedIn,
-          canRead: register("canRead", [], () => isSignedIn()),
+          canRead: def("canRead", {
+            body: () => isSignedIn(),
+          }),
         },
       }
     })

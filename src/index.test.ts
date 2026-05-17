@@ -1,65 +1,13 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  createAstRulesBuilder,
-  defineFirestoreRulesLibrary,
   type CollectionShape,
   type DatabaseDefinition,
+  createAstRulesBuilder,
+  defineFirestoreRulesLibrary,
 } from "./index"
-import ts from "typescript"
-import { readFileSync } from "node:fs"
-import path from "node:path"
-
-function loadDemoDefaultSource(): string {
-  const demoSourcePath = path.resolve(process.cwd(), "packages/demo/src/defaultSource.ts")
-  const fileContent = readFileSync(demoSourcePath, "utf8")
-  const match = fileContent.match(/export const defaultSource = `([\s\S]*)`\s*$/)
-
-  if (!match || !match[1]) {
-    throw new Error("Unable to parse defaultSource from packages/demo/src/defaultSource.ts")
-  }
-
-  return match[1]
-}
 
 describe("root barrel real-world integration", () => {
-  it("renders rules from the playground default source", () => {
-    const defaultSource = loadDemoDefaultSource()
-    const sourceForExecution = defaultSource.replace(
-      /^\s*import(?:\s+type)?\s+\{[^}]*\}\s+from\s+["']firestore-rules-dsl["'];?\s*$/gm,
-      "",
-    )
-
-    const transpiled = ts.transpileModule(sourceForExecution, {
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.ESNext,
-        ignoreDeprecations: "6.0",
-        strict: true,
-      },
-      reportDiagnostics: true,
-    })
-
-    expect(transpiled.diagnostics?.length ?? 0).toBe(0)
-
-    // Required to execute the imported playground source in test runtime.
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const runBuildRules = new Function(
-      "createAstRulesBuilder",
-      "defineFirestoreRulesLibrary",
-      `${transpiled.outputText}\nif (typeof buildRules !== "function") { throw new Error("Please define function buildRules() { ... }") }\nreturn buildRules();`,
-    ) as (
-      createAstRulesBuilderRef: typeof createAstRulesBuilder,
-      defineFirestoreRulesLibraryRef: typeof defineFirestoreRulesLibrary,
-    ) => unknown
-
-    const result = runBuildRules(createAstRulesBuilder, defineFirestoreRulesLibrary)
-    const renderedSource =
-      typeof result === "string" ? result : (result as { toString: () => string }).toString()
-
-    expect(renderedSource).toMatchSnapshot()
-  })
-
   it("comprehensive rules using all context helpers and methods", () => {
     type UserDoc = {
       displayName: string
@@ -113,48 +61,53 @@ describe("root barrel real-world integration", () => {
       AppClaims
     >
 
-    const authHelpers = defineFirestoreRulesLibrary((ctx, register) => {
-      const isSignedIn = register("isSignedIn", [], () =>
-        ctx.and(ctx.request.auth.neq(null), ctx.request.auth.uid.neq(null)),
-      )
-      const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) => {
-        return ctx.request.auth.uid.eq(ownerId)
+    const authHelpers = defineFirestoreRulesLibrary((ctx, { def, arg }) => {
+      const isSignedIn = def("isSignedIn", {
+        body: () => ctx.and(ctx.request.auth.neq(null), ctx.request.auth.uid.neq(null)),
+      })
+      const isOwner = def("isOwner", {
+        args: [arg("ownerId")<string>()],
+        body: ({ ownerId }) => ctx.request.auth.uid.eq(ownerId),
       })
       return { isSignedIn, isOwner }
     })
 
     const builder = createAstRulesBuilder<AppDb>()
       .withHelpers(authHelpers)
-      .withHelpers((ctx, register) => {
-        const isAdmin = register("isAdmin", [], () => {
-          return ctx.request.auth.token.admin.eq(true)
+      .withHelpers((ctx, { def, arg }) => {
+        const isAdmin = def("isAdmin", {
+          body: () => ctx.request.auth.token.admin.eq(true),
         })
-        const isMemberOfOrg = register("isMemberOfOrg", ["orgId"], ({ orgId }) => {
-          return ctx.request.auth.token.orgId.eq(orgId)
+        const isMemberOfOrg = def("isMemberOfOrg", {
+          args: [arg("orgId")<string>()],
+          body: ({ orgId }) => ctx.request.auth.token.orgId.eq(orgId),
         })
-        const notExpired = register("notExpired", ["expiresAt"], ({ expiresAt }) => {
-          return ctx.request.time.lt(expiresAt)
+        const notExpired = def("notExpired", {
+          args: [arg("expiresAt")<number>()],
+          body: ({ expiresAt }) => ctx.request.time.lt(expiresAt),
         })
-        const listRoles = register("listRoles", [], () => {
-          return ctx.ifElse(
-            ctx.hasPath(ctx.request, "auth.token.roles"),
-            ctx.request.auth.token.roles.split(","),
-            [],
-          )
+        const listRoles = def("listRoles", {
+          body: () =>
+            ctx.ifElse(
+              ctx.hasPath(ctx.request, "auth.token.roles"),
+              ctx.request.auth.token.roles.split(","),
+              [],
+            ),
         })
-        const hasRoles = register("hasRoles", [], () => {
-          return listRoles().size().gt(0)
+        const hasRoles = def("hasRoles", {
+          body: () => listRoles().size().gt(0),
         })
-        const canReadByMethod = register("canReadByMethod", [], () => {
-          return ctx.switchCase(
-            ctx.request.method,
-            [
-              ["get", true],
-              ["list", true],
-              ["read", true],
-            ],
-            false,
-          )
+        const canReadByMethod = def("canReadByMethod", {
+          body: () =>
+            ctx.switchCase(
+              ctx.request.method,
+              [
+                ["get", true],
+                ["list", true],
+                ["read", true],
+              ],
+              false,
+            ),
         })
         return { isAdmin, isMemberOfOrg, notExpired, listRoles, hasRoles, canReadByMethod }
       })
@@ -225,7 +178,7 @@ describe("root barrel real-world integration", () => {
               "update",
               $.or(
                 $.isOwner($.resource.data.ownerId),
-                $.and($.isAdmin(), $.not($.resource.data.status.eq("deleted"))),
+                $.and($.isAdmin(), $.not($.resource.data.status.eq("archived"))),
               ),
             )
 

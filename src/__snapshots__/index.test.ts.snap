@@ -42,36 +42,13 @@ service cloud.firestore {
       match /projects/{projectId} {
         allow read: if resource.data.public == true || isMemberOfOrg(orgId) && resource.data.status == 'active';
         allow create: if isMemberOfOrg(orgId) && resource.data.ownerId == request.auth.uid && resource.data.status == 'active';
-        allow update: if isOwner(resource.data.ownerId) || isAdmin() && !(resource.data.status == 'deleted');
+        allow update: if isOwner(resource.data.ownerId) || isAdmin() && !(resource.data.status == 'archived');
         allow delete: if isOwner(resource.data.ownerId);
       }
       match /invites/{inviteId} {
         allow read: if isMemberOfOrg(orgId) && notExpired(resource.data.expiresAt);
         allow create: if isMemberOfOrg(orgId) && resource.data.expiresAt > request.time && resource.data.expiresAt <= request.time + 2592000;
         allow delete: if notExpired(resource.data.expiresAt) && isOwner(resource.data.createdBy);
-      }
-    }
-  }
-}
-"
-`;
-
-exports[`root barrel real-world integration > renders rules from the playground default source 1`] = `
-"rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null && request.auth.uid != null;
-    }
-    function hasRole(role) {
-      let roles = request.auth != null && request.auth.token != null && request.auth.token.roles != null ? request.auth.token.roles.split(',') : [];
-      return roles.hasAny([role]);
-    }
-    match /users/{userId} {
-      allow read: if isSignedIn() && request.auth.uid == userId;
-      allow create, update, delete: if request.auth.token.admin == true;
-      match /notifications/{notificationId} {
-        allow create: if hasRole('notifier');
       }
     }
   }

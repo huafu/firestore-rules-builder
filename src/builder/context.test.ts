@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest"
-import type { ExpressionNode } from "../ast"
 import { createBuilderContext } from "./context"
 import type { CollectionShape, DatabaseDefinition } from "./db"
 
@@ -35,8 +34,7 @@ describe("createBuilderContext runtime", () => {
     // Check that request.time is an ExpressionNode
     const timeExpr = ctx.request.time
     expect(timeExpr).toBeDefined()
-    expect(timeExpr).toHaveProperty("kind")
-    expect((timeExpr as unknown as ExpressionNode).kind).toBe("MemberExpression")
+    expect(timeExpr).toHaveProperty("kind", "MemberExpression")
   })
 
   it("provides typed methods on expressions", () => {
@@ -46,8 +44,15 @@ describe("createBuilderContext runtime", () => {
     const expr = ctx.request.time
     const eqExpr = expr.eq(expr)
     expect(eqExpr).toBeDefined()
-    expect(eqExpr).toHaveProperty("kind")
-    expect((eqExpr as ExpressionNode).kind).toBe("BinaryExpression")
+    expect(eqExpr).toHaveProperty("kind", "BinaryExpression")
+  })
+
+  it("provides common helpers", () => {
+    const ctx = createBuilderContext<TestDb, "users/{userId}">()
+
+    const expr = ctx.request.time.plus(3600)
+    expect(expr).toBeDefined()
+    expect(expr).toHaveProperty("kind", "BinaryExpression")
   })
 
   it("provides resource.data field access", () => {
@@ -55,7 +60,7 @@ describe("createBuilderContext runtime", () => {
 
     const emailField = ctx.resource.data.email
     expect(emailField).toBeDefined()
-    expect(emailField).toHaveProperty("kind")
+    expect(emailField).toHaveProperty("kind", "MemberExpression")
   })
 
   it("provides global helper functions", () => {
@@ -63,7 +68,7 @@ describe("createBuilderContext runtime", () => {
 
     const existsExpr = ctx.exists(ctx.request.path)
     expect(existsExpr).toBeDefined()
-    expect(existsExpr).toHaveProperty("kind")
+    expect(existsExpr).toHaveProperty("kind", "CallExpression")
   })
 
   it("provides duration helpers", () => {
@@ -71,7 +76,7 @@ describe("createBuilderContext runtime", () => {
 
     const durationExpr = ctx.duration.time(1, 2, 3, 4)
     expect(durationExpr).toBeDefined()
-    expect(durationExpr).toHaveProperty("kind")
+    expect(durationExpr).toHaveProperty("kind", "CallExpression")
   })
 
   it("provides math helpers", () => {
@@ -79,7 +84,7 @@ describe("createBuilderContext runtime", () => {
 
     const mathExpr = ctx.math.abs(ctx.request.time)
     expect(mathExpr).toBeDefined()
-    expect(mathExpr).toHaveProperty("kind")
+    expect(mathExpr).toHaveProperty("kind", "CallExpression")
   })
 
   it("provides logical composition helpers (and/or/not)", () => {
@@ -91,13 +96,11 @@ describe("createBuilderContext runtime", () => {
     const isAdmin = ctx.request.auth.token.admin.eq(true)
     const isNotAdmin = ctx.not(isAdmin)
 
-    expect(isNotAdmin).toHaveProperty("kind")
-    expect((isNotAdmin as unknown as ExpressionNode).kind).toBe("UnaryExpression")
+    expect(isNotAdmin).toHaveProperty("kind", "UnaryExpression")
 
     const complexExpr = ctx.and(isOwner, ctx.or(isAdmin, isNotAdmin))
     expect(complexExpr).toBeDefined()
-    expect(complexExpr).toHaveProperty("kind")
-    expect((complexExpr as unknown as ExpressionNode).kind).toBe("LogicalExpression")
+    expect(complexExpr).toHaveProperty("kind", "LogicalExpression")
   })
 
   it("supports auth root null checks with method helpers", () => {
@@ -105,8 +108,7 @@ describe("createBuilderContext runtime", () => {
 
     const expr = ctx.request.auth.neq(null)
     expect(expr).toBeDefined()
-    expect(expr).toHaveProperty("kind")
-    expect((expr as ExpressionNode).kind).toBe("BinaryExpression")
+    expect(expr).toHaveProperty("kind", "BinaryExpression")
   })
 
   it("supports fixed-string equality checks on resource fields", () => {
@@ -114,8 +116,7 @@ describe("createBuilderContext runtime", () => {
 
     const expr = ctx.resource.data.email.eq("fixedString")
     expect(expr).toBeDefined()
-    expect(expr).toHaveProperty("kind")
-    expect((expr as ExpressionNode).kind).toBe("BinaryExpression")
+    expect(expr).toHaveProperty("kind", "BinaryExpression")
   })
 
   it("supports split helper on string fields", () => {
@@ -123,8 +124,7 @@ describe("createBuilderContext runtime", () => {
 
     const expr = ctx.resource.data.email.split(",")
     expect(expr).toBeDefined()
-    expect(expr).toHaveProperty("kind")
-    expect((expr as unknown as ExpressionNode).kind).toBe("CallExpression")
+    expect(expr).toHaveProperty("kind", "CallExpression")
   })
 
   it("supports ifElse helper for ternary-style expressions", () => {
@@ -132,8 +132,7 @@ describe("createBuilderContext runtime", () => {
 
     const expr = ctx.ifElse(ctx.request.auth.neq(null), ctx.request.auth.uid, "anonymous")
     expect(expr).toBeDefined()
-    expect(expr).toHaveProperty("kind")
-    expect((expr as unknown as ExpressionNode).kind).toBe("ConditionalExpression")
+    expect(expr).toHaveProperty("kind", "ConditionalExpression")
   })
 
   it("supports switchCase helper", () => {
@@ -148,8 +147,7 @@ describe("createBuilderContext runtime", () => {
       false,
     )
     expect(expr).toBeDefined()
-    expect(expr).toHaveProperty("kind")
-    expect((expr as unknown as ExpressionNode).kind).toBe("ConditionalExpression")
+    expect(expr).toHaveProperty("kind", "ConditionalExpression")
   })
 
   it("supports hasPath helper for safe object-chain checks", () => {
@@ -157,8 +155,7 @@ describe("createBuilderContext runtime", () => {
 
     const expr = ctx.hasPath(ctx.request, "auth.token.orgId")
     expect(expr).toBeDefined()
-    expect(expr).toHaveProperty("kind")
-    expect((expr as unknown as ExpressionNode).kind).toBe("LogicalExpression")
+    expect(expr).toHaveProperty("kind", "LogicalExpression")
   })
 
   it("supports list literal fallback in ifElse", () => {
@@ -166,8 +163,7 @@ describe("createBuilderContext runtime", () => {
 
     const expr = ctx.ifElse(ctx.request.auth.neq(null), ctx.request.auth.uid.split(","), [])
     expect(expr).toBeDefined()
-    expect(expr).toHaveProperty("kind")
-    expect((expr as unknown as ExpressionNode).kind).toBe("ConditionalExpression")
+    expect(expr).toHaveProperty("kind", "ConditionalExpression")
   })
 
   it("throws for invalid params access", () => {

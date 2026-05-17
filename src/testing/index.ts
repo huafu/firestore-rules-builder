@@ -20,6 +20,100 @@ import type { CollectionShape, DatabaseDefinition } from "../builder/db"
 import type { DeepMergeHelperLibraries, HelperLibrary } from "../builder/helpers"
 import type { FirestoreRulesLibrary } from "../library/index"
 import type { EmptyObject } from "../builder/utils"
+import ts from "typescript"
+import * as module from "../"
+import * as ast from "../ast"
+import * as builder from "../builder"
+import * as library from "../library"
+import * as testing from "../testing"
+import * as typesaurus from "../typesaurus"
+
+const ImportsName = "__imports"
+const Imports = {
+  module,
+  ast,
+  builder,
+  library,
+  testing,
+  typesaurus,
+}
+
+/**
+ * Internal utility to transform import statements in builder source for playground execution.
+ * Transforms `import ... from "firestore-rules-dsl(/ast|/builder|/library|/testing|/typesaurus)?"` to direct references to the corresponding namespace imports included in the playground environment."
+ */
+function transformImports(source: string): string {
+  const modules = "__modules"
+  const res = source.replace(
+    /^import\s+(.*)\s+from\s+["']firestore-rules-dsl(\/(ast|builder|library|testing|typesaurus))?["'];?$/gm,
+    (match, symbols: string, _, namespace: string) => {
+      const ns = namespace || "module"
+
+      // remap and take care of "as"
+      // handle *:
+      const uniqueMatches =
+        /^\s*(type\s+)?\*\s+as\s+(\w+)\s*$/gm.exec(symbols) ||
+        /^\s*(type\s+)?(\w+)\s*$/gm.exec(symbols)
+      if (uniqueMatches) return `const ${uniqueMatches[2]} = ${modules}.${ns}`
+      // handle { ... }:
+      const destructureMatches = /^\s*(type\s+)?{([^}]+)}\s*$/.exec(symbols)
+      if (destructureMatches) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const importsList = destructureMatches[2]!.split(",").map((s) => s.trim())
+        const destructured = importsList.map((s) => {
+          const asMatches = /^\s*(type\s+)?(\w+)(\s+as\s+(\w+))?\s*$/.exec(s)
+          if (!asMatches) {
+            throw new Error(`Unsupported import symbol: ${s}`)
+          }
+          if (asMatches[4]) return `${asMatches[2]}: ${asMatches[4]}`
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          return asMatches[2]!
+        })
+        return `const { ${destructured.join(", ")} } = ${modules}.${ns}`
+      }
+      return match
+    },
+  )
+  return `const ${modules} = ${ImportsName} as any;\n${res}`
+}
+
+type PlaygroundRunner = () => string | ReturnType<typeof module.createAstRulesBuilder>
+
+/** Internal utility to transpile and execute builder source in the playground. */
+export function buildPlaygroundSource(source: string): PlaygroundRunner {
+  const sourceForExecution = transformImports(source).replace(
+    /^\s*export\s+default\s+/gm,
+    "const __builder = ",
+  )
+
+  const transpiled = ts.transpileModule(sourceForExecution, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext,
+      ignoreDeprecations: "6.0",
+      strict: true,
+    },
+    reportDiagnostics: true,
+  })
+
+  if (transpiled.diagnostics && transpiled.diagnostics.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const first = transpiled.diagnostics[0]!
+    const message = ts.flattenDiagnosticMessageText(first.messageText, "\n")
+    throw new Error(`TypeScript: ${message}`)
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const res = new Function(
+    ImportsName,
+    `${transpiled.outputText}
+      if (typeof __builder === "undefined") { throw new Error("The default export must be defined.") }
+      if (__builder == null) { throw new Error("The default export must be a builder instance or a string.") }
+      return __builder;`,
+  ) as (imports: typeof Imports) => string | ReturnType<typeof module.createAstRulesBuilder>
+
+  return () => res(Imports)
+}
 
 /** Internal constraint for supported root database collection maps. */
 type CollectionMap = Record<string, CollectionShape<Record<string, unknown>, unknown>>

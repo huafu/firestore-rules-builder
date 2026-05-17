@@ -27,12 +27,16 @@ type DbB = DatabaseDefinition<
   }
 >
 
-const authLibrary = defineFirestoreRulesLibrary((ctx, register) => {
-  const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+const authLibrary = defineFirestoreRulesLibrary((ctx, { def }) => {
+  const isSignedIn = def("isSignedIn", {
+    body: () => ctx.request.auth.uid.is("string"),
+  })
 
   return {
     isSignedIn,
-    canRead: register("canRead", [], () => isSignedIn()),
+    canRead: def("canRead", {
+      body: () => isSignedIn(),
+    }),
   }
 })
 
@@ -57,13 +61,17 @@ describe("defineFirestoreRulesLibrary", () => {
   })
 
   it("supports namespaced helper exports", () => {
-    const namespacedLibrary = defineFirestoreRulesLibrary((ctx, register) => {
-      const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+    const namespacedLibrary = defineFirestoreRulesLibrary((ctx, { def }) => {
+      const isSignedIn = def("isSignedIn", {
+        body: () => ctx.request.auth.uid.is("string"),
+      })
 
       return {
         auth: {
           isSignedIn,
-          canRead: register("canRead", [], () => isSignedIn()),
+          canRead: def("canRead", {
+            body: () => isSignedIn(),
+          }),
         },
       }
     })
