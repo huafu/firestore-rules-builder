@@ -9,11 +9,13 @@ import {
   booleanLiteral,
   identifier,
   memberExpression,
+  pathExpression,
+  pathExpressionSegment,
+  pathLiteralSegment,
   binaryExpression,
   conditionalExpression,
   logicalExpression,
   unaryExpression,
-  callExpression,
   isExpression,
   listLiteral,
   mapEntry,
@@ -27,7 +29,6 @@ import {
   requestAuthTokenClaim,
   resourceId,
   resourceData,
-  resourceDataField,
   requestResource,
   requestResourceData,
   requestAuthUid,
@@ -38,7 +39,6 @@ import {
   requestQueryOrderBy,
   requestTime,
   keysOf,
-  existsMethod,
   sizeOf,
   hasAll,
   hasAny,
@@ -63,6 +63,27 @@ import {
   callHelper,
 } from "../ast/known-factories"
 import { extractPathParamNames, type EmptyObject } from "./utils"
+
+type DbPathPart = { kind: "literal"; value: string } | { kind: "expr"; value: ExpressionNode }
+
+/**
+ * Builds `/databases/$(database)/documents/...` from collection/id parts.
+ */
+function documentsPathExpression(parts: DbPathPart[]): ExpressionNode {
+  const segments = [
+    pathLiteralSegment("databases"),
+    pathExpressionSegment(identifier("database")),
+    pathLiteralSegment("documents"),
+  ]
+  for (const part of parts) {
+    if (part.kind === "literal") {
+      segments.push(pathLiteralSegment(part.value))
+    } else {
+      segments.push(pathExpressionSegment(part.value))
+    }
+  }
+  return pathExpression(segments)
+}
 
 /** Extracts route params from a path pattern like `users/{userId}/posts/{postId}`. */
 type PathParams<TPath extends string> = TPath extends `${infer Head}/${infer Tail}`
@@ -815,7 +836,8 @@ function unknownPropertyError(scope: string, prop: string, known?: readonly stri
  * Creates a handler for a rule-value proxy rooted at an expression node.
  *
  * The handler lazily resolves members/methods into AST expressions and caches
- * the generated proxy entries by property name.
+ * the generated proxy entries by property name. Unknown properties append onto
+ * `baseExpr` so `request.resource.data.x` and `get(ref).data.x` keep their root.
  *
  * @internal
  * @ts-expect-error Runtime proxy dispatch intentionally uses dynamic `any` access.
@@ -1035,8 +1057,8 @@ function createRuleValueProxyHandler(
         return fn
       }
 
-      // Fallback to nested field access (resource/request-resource style chains).
-      const fieldExpr = resourceDataField([...fieldPath, prop])
+      // Append onto the current base, not a hardcoded resource.data root.
+      const fieldExpr = memberExpression(baseExpr, identifier(prop))
       const result = new Proxy(
         fieldExpr,
         createRuleValueProxyHandler(fieldExpr, [...fieldPath, prop]),
@@ -1104,10 +1126,13 @@ function createRequestResourceDataProxy(): any {
  * @internal
  * @ts-expect-error Runtime proxy dispatch intentionally uses dynamic `any` access.
  */
-function createDbDocProxy(collectionPath: string, subcollections: Record<string, unknown>): any {
+function createDbDocProxy(parts: DbPathPart[], subcollections: Record<string, unknown>): any {
   const cache = new Map<string, any>()
   const subKeys = Object.keys(subcollections)
   const hasKnownSubcollections = subKeys.length > 0
+  const pathLabel = parts
+    .map((part) => (part.kind === "literal" ? part.value : "$(expr)"))
+    .join("/")
 
   return new Proxy(
     {},
@@ -1115,35 +1140,29 @@ function createDbDocProxy(collectionPath: string, subcollections: Record<string,
       get(_, prop: string | symbol) {
         if (typeof prop !== "string") return undefined
 
-        // Handle exists() and get() methods
         if (prop === "exists") {
-          const fn = () => {
-            const pathExpr = callExpression(identifier("path"), [identifier(collectionPath)])
-            return wrapExpressionInProxy(existsMethod(pathExpr))
-          }
+          const fn = () => wrapExpressionInProxy(exists(documentsPathExpression(parts)))
           return fn
         }
         if (prop === "get") {
-          const fn = () => {
-            const pathExpr = callExpression(identifier("path"), [identifier(collectionPath)])
-            return wrapExpressionInProxy(get(pathExpr))
-          }
+          const fn = () => wrapExpressionInProxy(get(documentsPathExpression(parts)))
           return fn
         }
 
-        // Restrict known subcollection names when schema metadata is present.
         if (!hasKnownSubcollections || subKeys.includes(prop)) {
           if (cache.has(prop)) return cache.get(prop)
 
-          const fn = (/* _id: any */) => {
-            const newPath = `${collectionPath}/${prop}/{id}`
-            return createDbDocProxy(newPath, {})
+          const fn = (id: any) => {
+            return createDbDocProxy(
+              [...parts, { kind: "literal", value: prop }, { kind: "expr", value: toExpressionNode(id) }],
+              {},
+            )
           }
           cache.set(prop, fn)
           return fn
         }
 
-        throw unknownPropertyError(`db document path "${collectionPath}"`, prop, subKeys)
+        throw unknownPropertyError(`db document path "${pathLabel}"`, prop, subKeys)
       },
     },
   )
@@ -1170,8 +1189,14 @@ function createDbRootProxy(collections: Record<string, unknown>): any {
         }
         if (cache.has(prop)) return cache.get(prop)
 
-        const fn = (/* id: any */) => {
-          return createDbDocProxy(prop, {})
+        const fn = (id: any) => {
+          return createDbDocProxy(
+            [
+              { kind: "literal", value: prop },
+              { kind: "expr", value: toExpressionNode(id) },
+            ],
+            {},
+          )
         }
         cache.set(prop, fn)
         return fn

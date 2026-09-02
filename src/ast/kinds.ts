@@ -32,6 +32,8 @@ export const NodeKind = {
   pathLiteralSegment: "PathLiteralSegment",
   pathVariableSegment: "PathVariableSegment",
   pathRecursiveSegment: "PathRecursiveSegment",
+  pathExpression: "PathExpression",
+  pathExpressionSegment: "PathExpressionSegment",
 } as const
 
 /**
@@ -79,6 +81,7 @@ export const ExpressionKind = [
   NodeKind.memberExpression,
   NodeKind.indexExpression,
   NodeKind.isExpression,
+  NodeKind.pathExpression,
 ] as const
 
 /**

@@ -12,6 +12,8 @@ import type {
   MapEntryNode,
   MapLiteralNode,
   MatchDeclarationNode,
+  PathExpressionNode,
+  PathExpressionSegmentNode,
   PathPatternNode,
   PathRecursiveSegmentNode,
   PathVariableSegmentNode,
@@ -69,6 +71,8 @@ export interface AstVisitor {
   ) => void
   PathVariableSegment?: (node: PathVariableSegmentNode, parent: AstNode | null) => void
   PathRecursiveSegment?: (node: PathRecursiveSegmentNode, parent: AstNode | null) => void
+  PathExpression?: (node: PathExpressionNode, parent: AstNode | null) => void
+  PathExpressionSegment?: (node: PathExpressionSegmentNode, parent: AstNode | null) => void
 }
 
 function dispatch(visitor: AstVisitor, node: AstNode, parent: AstNode | null): void {
@@ -133,6 +137,10 @@ function collectChildren(node: AstNode): AstNode[] {
     case NodeKind.pathVariableSegment:
     case NodeKind.pathRecursiveSegment:
       return [node.name]
+    case NodeKind.pathExpression:
+      return [...node.segments]
+    case NodeKind.pathExpressionSegment:
+      return [node.expression]
     default: {
       const neverNode: never = node
       return neverNode
@@ -183,6 +191,7 @@ export function walkExpressions(
         case NodeKind.memberExpression:
         case NodeKind.indexExpression:
         case NodeKind.isExpression:
+        case NodeKind.pathExpression:
           visitor(node, parent)
           break
         default:

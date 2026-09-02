@@ -94,6 +94,28 @@ export type PathSegmentNode =
   | PathRecursiveSegmentNode
 
 /**
+ * Interpolated `$(expr)` segment inside a path expression.
+ */
+export interface PathExpressionSegmentNode extends BaseNode {
+  kind: "PathExpressionSegment"
+  expression: ExpressionNode
+}
+
+/**
+ * Union of segments that can appear in a path expression.
+ */
+export type PathExpressionPart = PathLiteralSegmentNode | PathExpressionSegmentNode
+
+/**
+ * Expression-level path used by `get()` / `exists()`, e.g.
+ * `/databases/$(database)/documents/users/$(request.auth.uid)`.
+ */
+export interface PathExpressionNode extends BaseNode {
+  kind: "PathExpression"
+  segments: PathExpressionPart[]
+}
+
+/**
  * Allowed operations accepted by allow declarations.
  */
 export type AllowOperation = "get" | "list" | "create" | "update" | "delete" | "read" | "write"
@@ -320,6 +342,7 @@ export type ExpressionNode =
   | MemberExpressionNode
   | IndexExpressionNode
   | IsExpressionNode
+  | PathExpressionNode
 
 /**
  * Union of declaration nodes.
@@ -350,4 +373,5 @@ export type AstNode =
   | ExpressionNode
   | PathPatternNode
   | PathSegmentNode
+  | PathExpressionSegmentNode
   | MapEntryNode

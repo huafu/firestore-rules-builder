@@ -35,11 +35,11 @@ service cloud.firestore {
     }
     match /posts/{postId} {
       allow read: if resource.data.published == true;
-      allow create: if isSignedIn() && resource.data.authorId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
       allow update, delete: if isOwner(resource.data.authorId);
       match /comments/{commentId} {
         allow read: if true;
-        allow create: if isSignedIn() && isOwner(resource.data.authorId);
+        allow create: if isSignedIn() && isOwner(request.resource.data.authorId);
       }
     }
   }

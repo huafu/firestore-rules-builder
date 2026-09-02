@@ -30,24 +30,24 @@ service cloud.firestore {
     }
     match /users/{userId} {
       allow read: if canReadByMethod() && (isOwner(userId) || isSignedIn() || hasRoles());
-      allow create: if isSignedIn() && resource.data.createdAt == request.time && resource.data.email.split('@').size() == 2;
+      allow create: if isSignedIn() && request.resource.data.createdAt == request.time && request.resource.data.email.split('@').size() == 2;
       allow update: if isOwner(userId);
       allow delete: if isOwner(userId) || isAdmin();
     }
     match /orgs/{orgId} {
       allow read: if isMemberOfOrg(orgId);
-      allow create: if isSignedIn() && resource.data.ownerId == request.auth.uid && resource.data.plan == 'free';
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && request.resource.data.plan == 'free';
       allow update: if isAdmin() || isOwner(resource.data.ownerId);
       allow delete: if isAdmin();
       match /projects/{projectId} {
         allow read: if resource.data.public == true || isMemberOfOrg(orgId) && resource.data.status == 'active';
-        allow create: if isMemberOfOrg(orgId) && resource.data.ownerId == request.auth.uid && resource.data.status == 'active';
+        allow create: if isMemberOfOrg(orgId) && request.resource.data.ownerId == request.auth.uid && request.resource.data.status == 'active';
         allow update: if isOwner(resource.data.ownerId) || isAdmin() && !(resource.data.status == 'archived');
         allow delete: if isOwner(resource.data.ownerId);
       }
       match /invites/{inviteId} {
         allow read: if isMemberOfOrg(orgId) && notExpired(resource.data.expiresAt);
-        allow create: if isMemberOfOrg(orgId) && resource.data.expiresAt > request.time && resource.data.expiresAt <= request.time + 2592000;
+        allow create: if isMemberOfOrg(orgId) && request.resource.data.expiresAt > request.time && request.resource.data.expiresAt <= request.time + 2592000;
         allow delete: if notExpired(resource.data.expiresAt) && isOwner(resource.data.createdBy);
       }
     }

@@ -9,13 +9,18 @@ import {
   identifier,
   letStatement,
   matchDeclaration,
+  memberExpression,
+  pathExpression,
+  pathExpressionSegment,
   pathLiteralSegment,
   pathPattern,
   program,
   returnStatement,
   serviceDeclaration,
 } from "./factories"
+import { printNode } from "./printer"
 import { expressionFromSource, programFromSource } from "./source-factories"
+import { isPathExpressionNode } from "./guards"
 
 describe("ast factories", () => {
   it("builds a basic firestore rules tree", () => {
@@ -71,5 +76,22 @@ service cloud.firestore {
   it("throws for invalid source", () => {
     expect(() => programFromSource("service cloud.firestore {")).toThrow()
     expect(() => expressionFromSource("request.auth !=")).toThrow()
+  })
+
+  it("prints interpolated path expressions", () => {
+    const uid = memberExpression(
+      memberExpression(identifier("request"), identifier("auth")),
+      identifier("uid"),
+    )
+    const path = pathExpression([
+      pathLiteralSegment("databases"),
+      pathExpressionSegment(identifier("database")),
+      pathLiteralSegment("documents"),
+      pathLiteralSegment("users"),
+      pathExpressionSegment(uid),
+    ])
+
+    expect(isPathExpressionNode(path)).toBe(true)
+    expect(printNode(path)).toBe("/databases/$(database)/documents/users/$(request.auth.uid)")
   })
 })

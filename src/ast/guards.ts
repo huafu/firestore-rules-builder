@@ -7,6 +7,7 @@ import type {
   ExpressionNode,
   FunctionDeclarationNode,
   MatchDeclarationNode,
+  PathExpressionNode,
   PathPatternNode,
   PathSegmentNode,
   ProgramNode,
@@ -89,6 +90,13 @@ export function isExpressionNode(value: unknown): value is ExpressionNode {
  */
 export function isPathPatternNode(value: unknown): value is PathPatternNode {
   return isNode(value) && value.kind === NodeKind.pathPattern
+}
+
+/**
+ * Returns true when a value is an interpolated path expression node.
+ */
+export function isPathExpressionNode(value: unknown): value is PathExpressionNode {
+  return isNode(value) && value.kind === NodeKind.pathExpression
 }
 
 /**

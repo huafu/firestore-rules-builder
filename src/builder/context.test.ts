@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest"
+import type { ExpressionNode } from "../ast"
+import { printNode } from "../ast"
 import { createBuilderContext } from "./context"
 import type { CollectionShape, DatabaseDefinition } from "./db"
 
@@ -189,5 +191,69 @@ describe("createBuilderContext runtime", () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       ;(ctx.request.auth.token as Record<string, unknown>).unknownClaim
     }).toThrow('Unknown request.auth.token property "unknownClaim"')
+  })
+})
+
+type ReadmeDb = DatabaseDefinition<{
+  users: CollectionShape<{
+    createdAt: number
+    expiresAt: number
+    is_active: boolean
+    ref: string
+    metadata: Record<string, string>
+  }>
+}>
+
+describe("README field-access regressions (S2H-1840)", () => {
+  it("emits request.resource.data.createdAt against the request payload", () => {
+    const ctx = createBuilderContext<ReadmeDb, "users/{userId}">()
+    const expr = ctx.request.resource.data.createdAt.eq(ctx.request.time)
+    expect(printNode(expr as unknown as ExpressionNode)).toBe(
+      "request.resource.data.createdAt == request.time",
+    )
+  })
+
+  it("emits $.op on request.resource.data against the request payload", () => {
+    const ctx = createBuilderContext<ReadmeDb, "users/{userId}">()
+    const expr = ctx.op(ctx.request.resource.data.expiresAt, ">", ctx.request.time)
+    expect(printNode(expr as unknown as ExpressionNode)).toBe(
+      "request.resource.data.expiresAt > request.time",
+    )
+  })
+
+  it("diffs resource.data against request.resource.data, not against itself", () => {
+    const ctx = createBuilderContext<ReadmeDb, "users/{userId}">()
+    const expr = ctx.resource.data.metadata.diff(ctx.request.resource.data.metadata).changedKeys()
+    expect(printNode(expr as unknown as ExpressionNode)).toBe(
+      "resource.data.metadata.diff(request.resource.data.metadata).changedKeys()",
+    )
+  })
+
+  it("emits field access on get() against the fetched document", () => {
+    const ctx = createBuilderContext<ReadmeDb, "users/{userId}">()
+    const fetched = ctx.get(ctx.resource.data.ref) as unknown as {
+      data: { field: ExpressionNode }
+    }
+    expect(printNode(fetched.data.field)).toBe("get(resource.data.ref).data.field")
+  })
+
+  it("leaves resource.data field access unchanged", () => {
+    const ctx = createBuilderContext<ReadmeDb, "users/{userId}">()
+    expect(printNode(ctx.resource.data.is_active as unknown as ExpressionNode)).toBe(
+      "resource.data.is_active",
+    )
+  })
+
+  it("threads the document id through $.db.<collection>(id).get()", () => {
+    const ctx = createBuilderContext<ReadmeDb, "users/{userId}">()
+    const fetched = ctx.db.users(ctx.request.auth.uid).get() as unknown as ExpressionNode & {
+      data: ExpressionNode
+    }
+    expect(printNode(fetched)).toBe(
+      "get(/databases/$(database)/documents/users/$(request.auth.uid))",
+    )
+    expect(printNode(fetched.data)).toBe(
+      "get(/databases/$(database)/documents/users/$(request.auth.uid)).data",
+    )
   })
 })
