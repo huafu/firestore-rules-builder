@@ -5,6 +5,8 @@ import type {
   CommentNode,
   ExpressionNode,
   MapEntryNode,
+  PathExpressionNode,
+  PathExpressionPart,
   PathPatternNode,
   PathSegmentNode,
   ProgramNode,
@@ -32,6 +34,7 @@ const ExpressionPrecedence: Record<string, number> = {
   NullLiteral: 7,
   ListLiteral: 7,
   MapLiteral: 7,
+  PathExpression: 7,
 }
 
 const BinaryOperationPrecedence: Record<string, number> = {
@@ -83,6 +86,23 @@ function printPathSegment(node: PathSegmentNode): string {
 
 function printPathPattern(node: PathPatternNode): string {
   return `/${node.segments.map(printPathSegment).join("/")}`
+}
+
+/**
+ * Prints one segment of an interpolated path expression.
+ */
+function printPathExpressionPart(node: PathExpressionPart): string {
+  if (node.kind === NodeKind.pathLiteralSegment) {
+    return node.value
+  }
+  return `$(${printExpression(node.expression)})`
+}
+
+/**
+ * Prints `/databases/$(database)/documents/...` style paths.
+ */
+function printPathExpression(node: PathExpressionNode): string {
+  return `/${node.segments.map(printPathExpressionPart).join("/")}`
 }
 
 function printComment(node: CommentNode, indent: string): string {
@@ -146,6 +166,8 @@ function printExpression(node: ExpressionNode, minPrecedence = 0): string {
       const body = `${printExpression(node.object, ExpressionPrecedence.indexExpression)}[${printExpression(node.index)}]`
       return wrapIfNeeded(body, node, minPrecedence)
     }
+    case NodeKind.pathExpression:
+      return printPathExpression(node)
     default: {
       const neverNode: never = node
       return neverNode
@@ -236,10 +258,14 @@ export function printNode(node: AstNode, options: PrintOptions = {}): string {
       return printRuleStatement(node, 0, indentUnit)
     case NodeKind.pathPattern:
       return printPathPattern(node)
+    case NodeKind.pathExpression:
+      return printPathExpression(node)
     case NodeKind.pathLiteralSegment:
     case NodeKind.pathVariableSegment:
     case NodeKind.pathRecursiveSegment:
       return printPathSegment(node)
+    case NodeKind.pathExpressionSegment:
+      return printPathExpressionPart(node)
     case NodeKind.serviceDeclaration:
       return `service ${node.name.name} ${printBlock(node.body, 0, indentUnit)}`
     default:

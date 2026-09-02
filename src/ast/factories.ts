@@ -24,6 +24,9 @@ import type {
   MemberExpressionNode,
   NullLiteralNode,
   NumberLiteralNode,
+  PathExpressionNode,
+  PathExpressionPart,
+  PathExpressionSegmentNode,
   PathLiteralSegmentNode,
   PathPatternNode,
   PathRecursiveSegmentNode,
@@ -248,6 +251,26 @@ export function pathRecursiveSegment(
  */
 export function pathPattern(segments: PathSegmentNode[], options?: WithLocation): PathPatternNode {
   return withLoc({ kind: NodeKind.pathPattern, segments }, options)
+}
+
+/**
+ * Creates an interpolated `$(expr)` path segment.
+ */
+export function pathExpressionSegment(
+  expression: ExpressionNode,
+  options?: WithLocation,
+): PathExpressionSegmentNode {
+  return withLoc({ kind: NodeKind.pathExpressionSegment, expression }, options)
+}
+
+/**
+ * Creates an expression-level path such as `/databases/$(database)/documents/users/$(uid)`.
+ */
+export function pathExpression(
+  segments: PathExpressionPart[],
+  options?: WithLocation,
+): PathExpressionNode {
+  return withLoc({ kind: NodeKind.pathExpression, segments }, options)
 }
 
 /**

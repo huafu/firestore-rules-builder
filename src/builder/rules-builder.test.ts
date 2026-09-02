@@ -99,6 +99,36 @@ describe("ast rules builder", () => {
     expect(source).not.toContain("function neverUsed(")
   })
 
+  it("emits getUserData from $.db.users(uid).get().data", () => {
+    const builder = createAstRulesBuilder<TestDb>().withHelpers(($, register) => ({
+      getUserData: register("getUserData", [], () => {
+        const fetched = $.db.users($.request.auth.uid).get() as unknown as { data: RuleValue }
+        return fetched.data
+      }),
+    }))
+
+    builder.matches((match) => {
+      match("users/{userId}", (users, $) => {
+        users.allow("read", $.getUserData())
+      })
+    })
+
+    expect(builder.toString()).toMatchInlineSnapshot(`
+      "rules_version = '2';
+      service cloud.firestore {
+        match /databases/{database}/documents {
+          function getUserData() {
+            return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+          }
+          match /users/{userId} {
+            allow read: if getUserData();
+          }
+        }
+      }
+      "
+    `)
+  })
+
   it("rejects conflicting operations", () => {
     const builder = createAstRulesBuilder<TestDb>()
     builder.matches((match) => {

@@ -220,6 +220,40 @@ describe("builder helpers manager", () => {
     expect(source).toContain("return")
   })
 
+  it("emits field access on a let binding against the binding, not resource.data", () => {
+    const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
+      (ctx, register) => ({
+        isActiveAccess: register(
+          "isActiveAccess",
+          ["workspaceId"],
+          (args) => ({ access: args.workspaceId }),
+          (_args, lets) =>
+            ctx.and(
+              lets.access.neq(null),
+              (lets.access as RuleValue & { is_active: RuleValue }).is_active,
+            ),
+        ),
+      }),
+    )
+
+    const ctx = createBuilderContext<
+      TestDb,
+      "users/{userId}",
+      {
+        isActiveAccess(workspaceId: string): RuleValue
+      }
+    >({
+      customClaims: { admin: false, orgId: "", role: "" },
+      helperManager: manager,
+    })
+
+    ctx.isActiveAccess("ws1")
+    const source = printNode(manager.getUsedHelperDeclarations()[0]!)
+    expect(source).toContain("let access = workspaceId")
+    expect(source).toContain("return access != null && access.is_active")
+    expect(source).not.toContain("resource.data.is_active")
+  })
+
   it("tracks dependencies through lets-factory helpers", () => {
     const manager = new BuilderHelpersManager<TestDb, "users/{userId}">().withHelpers(
       (ctx, register) => {
