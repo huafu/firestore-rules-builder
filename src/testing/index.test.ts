@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest"
 
+import { readdirSync, readFileSync } from "node:fs"
+import path from "node:path"
+
 import type { RuleValue } from "../builder/context"
 import type { CollectionShape, DatabaseDefinition } from "../builder/db"
 import { defineFirestoreRulesLibrary } from "../library/index"
-import { createHelperLibraryTestHarness, createRulesTestHarness, buildRulesSource } from "./index"
+import {
+  createHelperLibraryTestHarness,
+  createRulesTestHarness,
+  buildRulesSource,
+  buildPlaygroundSource,
+} from "./index"
 
 type TestDb = DatabaseDefinition<
   {
@@ -82,14 +90,18 @@ describe("testing harness", () => {
 
   it("returns helper declarations emitted by used helper calls", () => {
     const harness = createRulesTestHarness<TestDb>((builder) => {
-      const withHelpers = builder.withHelpers((ctx, register) => {
-        const isOwner = register("isOwner", ["ownerId"], ({ ownerId }) => {
-          return ctx.request.auth.uid.eq(ownerId)
+      const withHelpers = builder.withHelpers((ctx, { def, arg }) => {
+        const isOwner = def("isOwner", {
+          args: [arg("ownerId")<string>()],
+          body: ({ ownerId }) => ctx.request.auth.uid.eq(ownerId),
         })
 
         return {
           isOwner,
-          canRead: register("canRead", ["ownerId"], ({ ownerId }) => isOwner(ownerId)),
+          canRead: def("canRead", {
+            args: [arg("ownerId")<string>()],
+            body: ({ ownerId }) => isOwner(ownerId),
+          }),
         }
       })
 
@@ -105,12 +117,12 @@ describe("testing harness", () => {
   })
 
   it("supports reusable helper libraries and helper source assertions", () => {
-    const authLibrary = defineFirestoreRulesLibrary((ctx, register) => {
-      const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+    const authLibrary = defineFirestoreRulesLibrary((ctx, { def }) => {
+      const isSignedIn = def("isSignedIn", { body: () => ctx.request.auth.uid.is("string") })
 
       return {
         isSignedIn,
-        canRead: register("canRead", [], () => isSignedIn()),
+        canRead: def("canRead", { body: () => isSignedIn() }),
       }
     })
 
@@ -136,13 +148,13 @@ describe("testing harness", () => {
   })
 
   it("supports namespaced helper libraries", () => {
-    const namespacedLibrary = defineFirestoreRulesLibrary((ctx, register) => {
-      const isSignedIn = register("isSignedIn", [], () => ctx.request.auth.uid.is("string"))
+    const namespacedLibrary = defineFirestoreRulesLibrary((ctx, { def }) => {
+      const isSignedIn = def("isSignedIn", { body: () => ctx.request.auth.uid.is("string") })
 
       return {
         auth: {
           isSignedIn,
-          canRead: register("canRead", [], () => isSignedIn()),
+          canRead: def("canRead", { body: () => isSignedIn() }),
         },
       }
     })
@@ -164,3 +176,28 @@ describe("testing harness", () => {
     ])
   })
 })
+
+function discoverExamples(): { name: string; source: string }[] {
+  const examplesDir = path.resolve(process.cwd(), "packages/demo/src/examples")
+  const files = readdirSync(examplesDir).filter((f) => f.endsWith(".ts"))
+
+  return files.map((file) => ({
+    name: file.replace(/\.ts$/, ""),
+    source: readFileSync(path.join(examplesDir, file), "utf8"),
+  }))
+}
+
+describe("playground source builder", () => {
+  const examples = discoverExamples()
+
+  it.each(examples)("renders rules from the '$name' example", ({ source }) => {
+    const runner = buildPlaygroundSource(source)
+
+    const result = runner()
+    const renderedSource =
+      typeof result === "string" ? result : (result as { toString: () => string }).toString()
+
+    expect(renderedSource).toMatchSnapshot()
+  })
+})
+

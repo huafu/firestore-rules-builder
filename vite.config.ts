@@ -15,6 +15,12 @@ export default defineConfig({
       formats: ["es", "cjs"],
       fileName: (format, entryName) => (format === "es" ? `${entryName}.js` : `${entryName}.cjs`),
     },
+    rolldownOptions: {
+      external: ["typescript", "typesaurus"],
+    },
+  },
+  oxc: {
+    exclude: ["**/*.test.ts", "**/*.test-d.ts"],
   },
   plugins: [
     dts({

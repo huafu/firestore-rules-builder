@@ -24,10 +24,17 @@ export type {
 } from "./builder/db"
 
 export type {
+  ArgsHelperConfig,
+  BuilderHelperApi as BuilderHelperAPI,
   BuilderHelpersFactory,
+  HelperDefinitionConfig,
   HelperFunction,
   HelperLibrary,
   RegisterContextHelper,
+  TypedArgDescriptor,
+  ZeroArgHelperConfig,
 } from "./builder/helpers"
+
+export { arg } from "./builder/helpers"
 
 export { defineFirestoreRulesLibrary, type FirestoreRulesLibrary } from "./library/index"

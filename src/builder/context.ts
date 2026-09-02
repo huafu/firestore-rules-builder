@@ -112,7 +112,12 @@ type RuleValueLiteral =
   | null
   | RuleValueLiteral[]
   | { [key: string]: RuleValueLiteral }
-type RuleValueInput = Expr | RuleValueLiteral
+// if T is unknown, we want to allow any literal type, else only allow literals assignable to T and RuleValueProxy<T> types
+type RuleValueInput<T> = T extends readonly (infer U)[]
+  ? T | RuleValueProxy<T> | RuleValueInput<U>[]
+  : T extends (infer U)[]
+    ? T | RuleValueProxy<T> | RuleValueInput<U>[]
+    : T | RuleValueProxy<T>
 
 type NonFunctionKeys<T> = Extract<
   {
@@ -130,27 +135,18 @@ type DotPath<T> =
       }[NonFunctionKeys<T>]
     : never
 
-type ValueFromInput<T> = T extends RuleValue<infer U> ? U : T extends RuleValueLiteral ? T : unknown
+type ValueFromInput<T> =
+  T extends RuleValue<any> ? TypeOfRuleValue<T> : T extends RuleValueLiteral ? T : unknown
 
-type ListLikeBranch = {
-  size(): RuleValue<number>
-  hasAll(values: Expr): RuleValue<boolean>
-  hasAny(values: Expr): RuleValue<boolean>
-  hasOnly(values: Expr): RuleValue<boolean>
-}
-
-type IfElseResultValue<C, A> = C extends readonly unknown[]
-  ? C
-  : A extends readonly unknown[]
-    ? A
-    : C extends ListLikeBranch
-      ? unknown[]
-      : A extends ListLikeBranch
-        ? unknown[]
-        : ValueFromInput<C> | ValueFromInput<A>
+type IfElseResultValue<C, A> =
+  ValueFromInput<C> extends never[]
+    ? ValueFromInput<A>
+    : ValueFromInput<A> extends never[]
+      ? ValueFromInput<C>
+      : ValueFromInput<C> | ValueFromInput<A>
 
 /** Common comparison/type-check methods available on all proxied values. */
-type CommonValueMethods = {
+type CommonValueMethods<TValue> = {
   /**
    * Type-check: returns `true` if the value is an instance of the given Firestore type.
    * @param typeName - A Firestore type name (e.g., `"string"`, `"number"`, `"map"`, `"array"`).
@@ -159,7 +155,7 @@ type CommonValueMethods = {
    * $.request.auth.uid.is("string")  // true if uid is a string
    * ```
    */
-  is(typeName: FirestoreTypeName): Expr
+  is(typeName: FirestoreTypeName): RuleValueProxy<boolean>
   /**
    * Equality: returns `true` if this value equals `value`.
    * @param value - The value to compare against.
@@ -168,7 +164,7 @@ type CommonValueMethods = {
    * $.resource.data.status.eq("active")
    * ```
    */
-  eq(value: RuleValueInput): Expr
+  eq(value: RuleValueInput<TValue | null>): RuleValueProxy<boolean>
   /**
    * Inequality: returns `true` if this value does not equal `value`.
    * @param value - The value to compare against.
@@ -177,7 +173,7 @@ type CommonValueMethods = {
    * $.request.method.neq("delete")
    * ```
    */
-  neq(value: RuleValueInput): Expr
+  neq(value: RuleValueInput<TValue | null>): RuleValueProxy<boolean>
   /**
    * Greater than: returns `true` if this value is greater than `value`.
    * @param value - The value to compare against.
@@ -186,7 +182,7 @@ type CommonValueMethods = {
    * $.resource.data.count.gt(0)
    * ```
    */
-  gt(value: RuleValueInput): Expr
+  gt(value: RuleValueInput<TValue>): RuleValueProxy<boolean>
   /**
    * Greater than or equal: returns `true` if this value is >= `value`.
    * @param value - The value to compare against.
@@ -195,7 +191,7 @@ type CommonValueMethods = {
    * $.request.time.gte($.resource.data.createdAt)
    * ```
    */
-  gte(value: RuleValueInput): Expr
+  gte(value: RuleValueInput<TValue>): RuleValueProxy<boolean>
   /**
    * Less than: returns `true` if this value is less than `value`.
    * @param value - The value to compare against.
@@ -204,7 +200,7 @@ type CommonValueMethods = {
    * $.request.time.lt($.resource.data.expiresAt)
    * ```
    */
-  lt(value: RuleValueInput): Expr
+  lt(value: RuleValueInput<TValue>): RuleValueProxy<boolean>
   /**
    * Less than or equal: returns `true` if this value is <= `value`.
    * @param value - The value to compare against.
@@ -213,7 +209,7 @@ type CommonValueMethods = {
    * $.resource.data.priority.lte(10)
    * ```
    */
-  lte(value: RuleValueInput): Expr
+  lte(value: RuleValueInput<TValue>): RuleValueProxy<boolean>
   /**
    * Arithmetic addition: returns `this + value`.
    * @param value - The value to add.
@@ -222,7 +218,7 @@ type CommonValueMethods = {
    * $.request.time.plus(3600)  // 1 hour later
    * ```
    */
-  plus(value: RuleValueInput): Expr
+  plus(value: RuleValueInput<TValue>): RuleValueProxy<TValue>
   /**
    * Arithmetic subtraction: returns `this - value`.
    * @param value - The value to subtract.
@@ -231,7 +227,7 @@ type CommonValueMethods = {
    * $.resource.data.total.minus($.resource.data.discount)
    * ```
    */
-  minus(value: RuleValueInput): Expr
+  minus(value: RuleValueInput<TValue>): RuleValueProxy<TValue>
   /**
    * Arithmetic multiplication: returns `this * value`.
    * @param value - The multiplier.
@@ -240,7 +236,7 @@ type CommonValueMethods = {
    * $.resource.data.quantity.multiply($.resource.data.unitPrice)
    * ```
    */
-  multiply(value: RuleValueInput): Expr
+  multiply(value: RuleValueInput<TValue>): RuleValueProxy<TValue>
   /**
    * Arithmetic division: returns `this / value`.
    * @param value - The divisor.
@@ -249,7 +245,7 @@ type CommonValueMethods = {
    * $.resource.data.total.divide($.resource.data.count)
    * ```
    */
-  divide(value: RuleValueInput): Expr
+  divide(value: RuleValueInput<TValue>): RuleValueProxy<TValue>
   /**
    * Modulo/remainder: returns `this % value`.
    * @param value - The divisor for the modulo operation.
@@ -258,11 +254,62 @@ type CommonValueMethods = {
    * $.resource.data.id.modulo(2).eq(0)  // true if id is even
    * ```
    */
-  modulo(value: RuleValueInput): Expr
+  modulo(value: RuleValueInput<TValue>): RuleValueProxy<TValue>
 }
 
 /** String-specific helper methods available on string-like values. */
 type StringMethods = {
+  /**
+   * Returns the number of UTF-16 code units in the string.
+   * @example
+   * ```ts
+   * $.resource.data.name.size().lte(100)
+   * ```
+   */
+  size(): RuleValueProxy<number>
+  /**
+   * Converts the string to lowercase.
+   * @example
+   * ```ts
+   * $.resource.data.email.lower().eq("admin@example.com")
+   * ```
+   */
+  lower(): RuleValueProxy<string>
+  /**
+   * Converts the string to uppercase.
+   * @example
+   * ```ts
+   * $.resource.data.code.upper().eq("ABC")
+   * ```
+   */
+  upper(): RuleValueProxy<string>
+  /**
+   * Removes leading and trailing whitespace from the string.
+   * @example
+   * ```ts
+   * $.resource.data.tag.trim().neq("")
+   * ```
+   */
+  trim(): RuleValueProxy<string>
+  /**
+   * Returns `true` if the string matches the given regular expression.
+   * @param re - A regular expression string.
+   * @example
+   * ```ts
+   * $.resource.data.email.matches(".*@example\\.com")
+   * ```
+   */
+  matches(re: RuleValueInput<string>): RuleValueProxy<boolean>
+  /**
+   * Returns a new string with all regex matches replaced by the substitution string.
+   * @param re - A regular expression string to match.
+   * @param sub - The replacement string.
+   * @example
+   * ```ts
+   * $.resource.data.slug.replace("-", "_")
+   * ```
+   */
+  replace(re: RuleValueInput<string>, sub: RuleValueInput<string>): RuleValueProxy<string>
   /**
    * Splits a string into an array of substrings using the provided separator.
    * @param separator - The delimiter expression.
@@ -271,11 +318,19 @@ type StringMethods = {
    * $.request.auth.token.passportIds.split(",")
    * ```
    */
-  split(separator: RuleValueInput): RuleValueProxy<string[]>
+  split(separator: RuleValueInput<string>): RuleValueProxy<string[]>
+  /**
+   * Converts the string to a byte array (UTF-8 encoded).
+   * @example
+   * ```ts
+   * $.resource.data.token.toUtf8Bytes().size().gt(0)
+   * ```
+   */
+  toUtf8Bytes(): RuleValueProxy<readonly number[]>
 }
 
 /** List-specific helper methods available on array-like values. */
-type ListMethods = {
+type ListMethods<T> = {
   /**
    * Returns the number of elements in the list.
    * @example
@@ -292,7 +347,7 @@ type ListMethods = {
    * $.resource.data.requiredTags.hasAll($.request.auth.token.userTags)
    * ```
    */
-  hasAll(values: Expr): RuleValueProxy<boolean>
+  hasAll(values: RuleValueInput<T[]>): RuleValueProxy<boolean>
   /**
    * Returns `true` if the list contains any of the values from the given set.
    * @param values - A set expression to check.
@@ -301,7 +356,7 @@ type ListMethods = {
    * $.resource.data.collaborators.hasAny($.request.auth.token.userId.toSet())
    * ```
    */
-  hasAny(values: Expr): RuleValueProxy<boolean>
+  hasAny(values: RuleValueInput<T[]>): RuleValueProxy<boolean>
   /**
    * Returns `true` if the list contains only and all values from the given set (exact match).
    * @param values - A set expression to check.
@@ -310,7 +365,7 @@ type ListMethods = {
    * $.resource.data.roles.hasOnly(["admin", "editor"])
    * ```
    */
-  hasOnly(values: Expr): RuleValueProxy<boolean>
+  hasOnly(values: RuleValueInput<T[]>): RuleValueProxy<boolean>
   /**
    * Returns a string that joins all list elements with the given separator.
    * @param separator - The separator string or expression.
@@ -319,7 +374,7 @@ type ListMethods = {
    * $.resource.data.tags.join(",")
    * ```
    */
-  join(separator: Expr): RuleValueProxy<string>
+  join(this: RuleValueProxy<T[]>, separator: RuleValueInput<string>): RuleValueProxy<string>
   /**
    * Returns a new list combining this list with another list.
    * @param values - The list to concatenate.
@@ -328,7 +383,7 @@ type ListMethods = {
    * $.resource.data.existingTags.concat($.request.data.newTags)
    * ```
    */
-  concat(values: Expr): RuleValueProxy<unknown[]>
+  concat(this: RuleValueProxy<T[]>, values: RuleValueInput<T[]>): RuleValueProxy<T[]>
   /**
    * Returns a new list with all elements from the given set removed.
    * @param values - A set of values to remove.
@@ -337,7 +392,7 @@ type ListMethods = {
    * $.resource.data.roles.removeAll(["guest"])
    * ```
    */
-  removeAll(values: Expr): RuleValueProxy<unknown[]>
+  removeAll(values: RuleValueInput<T[]>): RuleValueProxy<T[]>
   /**
    * Returns the list as a set (unique values only).
    * @example
@@ -345,11 +400,11 @@ type ListMethods = {
    * $.resource.data.tags.toSet()
    * ```
    */
-  toSet(): RuleValueProxy<unknown[]>
+  toSet(): RuleValueProxy<T[]>
 }
 
 /** Map-specific helper methods available on object/map values. */
-type MapMethods = {
+type MapMethods<T> = {
   /**
    * Returns the number of key-value pairs in the map.
    * @example
@@ -365,7 +420,7 @@ type MapMethods = {
    * $.resource.data.config.keys().hasAny(["enabled", "disabled"])
    * ```
    */
-  keys(): RuleValueProxy<string[]>
+  keys(): RuleValueProxy<(keyof T & string)[]>
   /**
    * Compares this map with another map and returns a diff object with methods to inspect changes.
    * @param other - The map to compare against.
@@ -422,6 +477,7 @@ type MapDiffProxy = Expr & {
   unchangedKeys(): RuleValueProxy<string[]>
 }
 
+declare const __type: unique symbol
 /**
  * Typed proxy representation for rule values.
  *
@@ -429,14 +485,16 @@ type MapDiffProxy = Expr & {
  * methods and recursive property access for object-like values.
  */
 type RuleValueProxy<T> = Expr &
-  CommonValueMethods &
+  CommonValueMethods<T> &
   (T extends string ? StringMethods : EmptyObject) &
-  (T extends readonly unknown[] ? ListMethods : EmptyObject) &
+  (T extends readonly (infer U)[] ? ListMethods<U> : EmptyObject) &
+  (T extends (infer U)[] ? ListMethods<U> : EmptyObject) &
   (T extends Record<string, unknown>
-    ? MapMethods & { [K in StringKeyOf<T>]: RuleValueProxy<T[K]> }
-    : EmptyObject)
+    ? MapMethods<T> & { [K in StringKeyOf<T>]: RuleValueProxy<T[K]> }
+    : EmptyObject) & { [__type]: T }
 
 export type RuleValue<T = unknown> = RuleValueProxy<T>
+export type TypeOfRuleValue<T> = T extends RuleValueProxy<any> ? T[typeof __type] : never
 
 /** Proxy shape for `resource` and `request.resource`. */
 type ResourceProxy<TDoc> = {
@@ -448,10 +506,10 @@ type ResourceProxy<TDoc> = {
 type RequestAuthProxy<TClaims extends Record<string, unknown>> = RuleValueProxy<{
   uid: string
   token: TClaims
-}> & {
+} | null> & {
   uid: RuleValueProxy<string>
   token: RuleValueProxy<TClaims>
-}
+} & MapMethods<TClaims>
 
 /** Proxy shape for `request`. */
 type RequestProxy<TDoc, TClaims extends Record<string, unknown>> = {
@@ -585,8 +643,8 @@ type GlobalHelpers = {
    */
   ifElse<TConsequent, TAlternate>(
     test: Expr,
-    consequent: TConsequent & RuleValueInput,
-    alternate: TAlternate & RuleValueInput,
+    consequent: TConsequent,
+    alternate: TAlternate,
   ): RuleValue<IfElseResultValue<TConsequent, TAlternate>>
 
   /**
@@ -602,11 +660,11 @@ type GlobalHelpers = {
    * $.switchCase($.resource.data.plan, [["free", 1], ["pro", 2]], 0)
    * ```
    */
-  switchCase<TResult extends RuleValueInput>(
-    value: RuleValueInput,
-    cases: readonly (readonly [RuleValueInput, TResult])[],
-    fallback: TResult,
-  ): RuleValue<ValueFromInput<TResult>>
+  switchCase<T, R>(
+    value: RuleValueInput<T>,
+    cases: readonly (readonly [RuleValueInput<T>, RuleValueInput<R>])[],
+    fallback: RuleValueInput<R>,
+  ): RuleValueProxy<R>
 
   /**
    * Returns `true` when all members in a dotted path are non-null.
@@ -749,13 +807,13 @@ export interface CreateBuilderContextOptions<
 }
 
 /** Converts primitive/public expression values into expression nodes. */
-function toExpressionNode(value: RuleValueInput): ExpressionNode {
+function toExpressionNode(value: RuleValueInput<any>): ExpressionNode {
   if (typeof value === "string") return stringLiteral(value)
   if (typeof value === "number") return numberLiteral(value)
   if (typeof value === "boolean") return booleanLiteral(value)
   if (value === null) return nullLiteral()
   if (Array.isArray(value)) return listLiteral(value.map((item) => toExpressionNode(item)))
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
   if (typeof value === "object" && value && !("kind" in value)) {
     return mapLiteral(
       Object.entries(value).map(([key, entryValue]) =>
@@ -763,7 +821,7 @@ function toExpressionNode(value: RuleValueInput): ExpressionNode {
       ),
     )
   }
-  return value as unknown as ExpressionNode
+  return value
 }
 
 /** Builds consistent unknown-property error messages for proxy contexts. */
@@ -802,70 +860,115 @@ function createRuleValueProxyHandler(
       // Common value methods: is, eq, neq, gt, gte, lt, lte
       if (prop === "is") {
         const fn = (typeName: FirestoreTypeName) => {
-          return isExpression(baseExpr, typeName)
+          return wrapExpressionInProxy(isExpression(baseExpr, typeName))
         }
         cache.set(prop, fn)
         return fn
       }
       if (prop === "eq") {
-        const fn = (other: any) => binaryExpression("==", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("==", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "neq") {
-        const fn = (other: any) => binaryExpression("!=", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("!=", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "gt") {
-        const fn = (other: any) => binaryExpression(">", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression(">", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "gte") {
-        const fn = (other: any) => binaryExpression(">=", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression(">=", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "lt") {
-        const fn = (other: any) => binaryExpression("<", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("<", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "lte") {
-        const fn = (other: any) => binaryExpression("<=", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("<=", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "plus") {
-        const fn = (other: any) => binaryExpression("+", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("+", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "minus") {
-        const fn = (other: any) => binaryExpression("-", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("-", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "multiply") {
-        const fn = (other: any) => binaryExpression("*", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("*", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "divide") {
-        const fn = (other: any) => binaryExpression("/", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("/", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
       if (prop === "modulo") {
-        const fn = (other: any) => binaryExpression("%", baseExpr, toExpressionNode(other))
+        const fn = (other: any) =>
+          wrapExpressionInProxy(binaryExpression("%", baseExpr, toExpressionNode(other)))
         cache.set(prop, fn)
         return fn
       }
 
+      if (prop === "lower") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "lower", []))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "upper") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "upper", []))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "trim") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "trim", []))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "matches") {
+        const fn = (re: any) =>
+          wrapExpressionInProxy(callMethod(baseExpr, "matches", [toExpressionNode(re)]))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "replace") {
+        const fn = (re: any, sub: any) =>
+          wrapExpressionInProxy(
+            callMethod(baseExpr, "replace", [toExpressionNode(re), toExpressionNode(sub)]),
+          )
+        cache.set(prop, fn)
+        return fn
+      }
       if (prop === "split") {
         const fn = (separator: any) =>
           wrapExpressionInProxy(callMethod(baseExpr, "split", [toExpressionNode(separator)]))
+        cache.set(prop, fn)
+        return fn
+      }
+      if (prop === "toUtf8Bytes") {
+        const fn = () => wrapExpressionInProxy(callMethod(baseExpr, "toUtf8Bytes", []))
         cache.set(prop, fn)
         return fn
       }
@@ -1367,7 +1470,7 @@ export function createBuilderContext<
         }
 
         currentExpr = toExpressionNode(
-          (root as Record<string, unknown>)[firstSegment] as RuleValueInput,
+          (root as Record<string, unknown>)[firstSegment] as RuleValueInput<any>,
         )
         startIndex = 1
       } else {

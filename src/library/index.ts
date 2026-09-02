@@ -1,10 +1,6 @@
 import type { BuilderContext } from "../builder/context"
 import type { DatabaseDefinition } from "../builder/db"
-import type { HelperLibrary, RegisterContextHelper } from "../builder/helpers"
-
-type AnyDatabaseDefinition = DatabaseDefinition<unknown, Record<string, unknown>>
-type AnyContext = BuilderContext<AnyDatabaseDefinition, string, HelperLibrary>
-type AnyRegister = RegisterContextHelper
+import type { BuilderHelperApi, HelperLibrary } from "../builder/helpers"
 
 /**
  * Reusable helper library contract that stays generic over database/path scope.
@@ -20,7 +16,7 @@ export type FirestoreRulesLibrary<NewLib extends HelperLibrary> = <
   Lib extends HelperLibrary,
 >(
   context: BuilderContext<Db, AtPath, Lib>,
-  register: RegisterContextHelper,
+  helpers: BuilderHelperApi,
 ) => NewLib
 
 /**
@@ -35,13 +31,10 @@ export type FirestoreRulesLibrary<NewLib extends HelperLibrary> = <
  */
 export function defineFirestoreRulesLibrary<NewLib extends HelperLibrary>(
   library: FirestoreRulesLibrary<NewLib>,
-): FirestoreRulesLibrary<NewLib>
-export function defineFirestoreRulesLibrary<NewLib extends HelperLibrary>(
-  library: (context: AnyContext, register: AnyRegister) => NewLib,
 ): FirestoreRulesLibrary<NewLib> {
   // TS can reject assigning contextually-typed arrow callbacks to higher-rank
   // generic function types when generic parameters appear in nested mapped types.
   // Accepting a broad contextual callback overload keeps authoring ergonomic,
   // while we still return the canonical generic reusable library contract.
-  return library as FirestoreRulesLibrary<NewLib>
+  return library
 }
